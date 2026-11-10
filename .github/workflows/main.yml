@@ -1,0 +1,45 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.3
+
+      - name: Clé de signature (depuis les secrets du dépôt)
+        env:
+          KS_B64: ${{ secrets.RKTRL_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then echo "::error::Secret RKTRL_KEYSTORE_B64 manquant"; exit 1; fi
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/rktrl.keystore"
+
+      - name: Compiler l'APK
+        env:
+          RKTRL_KEYSTORE_FILE: ${{ runner.temp }}/rktrl.keystore
+          RKTRL_KEYSTORE_PASSWORD: ${{ secrets.RKTRL_KEYSTORE_PASSWORD }}
+        run: |
+          DIR=$(dirname "$(find . -name settings.gradle.kts -not -path '*/.git/*' | head -1)")
+          cd "$DIR"
+          gradle assembleDebug --stacktrace
+
+      - name: Effacer la clé
+        if: always()
+        run: rm -f "$RUNNER_TEMP/rktrl.keystore"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RKTRL-apk
+          path: '**/app/build/outputs/apk/debug/app-debug.apk'

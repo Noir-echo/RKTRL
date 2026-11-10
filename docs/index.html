@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F3EBDD">
+  <meta name="description" content="RKTRL — séquenceur MIDI et contrôleur créatif pour Android. 1024 steps, 128 contrôles CC assignables et Destroy Mode.">
+  <title>RKTRL — MIDI sequencer & controller for Android</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #F3EBDD;
+      --orange: #FF6A00;
+      --ink: #111111;
+      --muted: #68645d;
+      --line: #171717;
+      --mono: "Space Mono", "Courier New", monospace;
+      --max: 1240px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--paper);
+      font-family: var(--mono);
+      font-weight: 700;
+      font-style: italic;
+      line-height: 1.55;
+    }
+    a { color: inherit; }
+    .wrap { width: min(var(--max), calc(100% - 48px)); margin: auto; }
+    header { border-bottom: 3px solid var(--ink); background: var(--paper); }
+    .nav { min-height: 76px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
+    .wordmark { font-size: clamp(1.6rem,3vw,2.25rem); letter-spacing:-.08em; }
+    .wordmark span { color:var(--orange); }
+    .nav-tag { font-size:.76rem; text-transform:uppercase; letter-spacing:.08em; }
+    .hero { padding: clamp(64px, 10vw, 126px) 0 88px; display:grid; grid-template-columns: 1.08fr .92fr; gap:52px; align-items:center; }
+    .eyebrow { color:var(--orange); font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; }
+    h1 { margin:18px 0 24px; font-size:clamp(3.4rem, 8.5vw, 7.2rem); line-height:.98; letter-spacing:-.095em; }
+    h1 span { color:var(--orange); }
+    .lead { max-width:680px; font-size:clamp(1rem, 1.5vw, 1.18rem); line-height:1.7; }
+    .actions { display:flex; flex-wrap:wrap; gap:14px; margin-top:34px; }
+    .btn {
+      min-height:62px; padding:14px 25px; display:inline-flex; justify-content:center; align-items:center;
+      text-decoration:none; text-align:center; font:700 italic clamp(.86rem,1.5vw,1rem) var(--mono);
+      border:3px solid var(--ink); background:var(--paper); color:var(--ink);
+      clip-path:polygon(12% 0,100% 0,100% 78%,88% 100%,0 100%,0 22%);
+      transition:transform .16s ease, background .16s ease, color .16s ease;
+    }
+    .btn.primary { background:var(--orange); }
+    .btn:hover { transform:translateY(-3px); background:var(--ink); color:var(--paper); }
+    .btn.primary:hover { background:var(--ink); color:var(--orange); }
+    .meta { margin-top:18px; font-size:.75rem; color:var(--muted); }
+    .hero-art { position:relative; border:3px solid var(--ink); padding:12px; background:#e8dfd0; box-shadow:12px 12px 0 var(--orange); }
+    .hero-art img { display:block; width:100%; height:auto; }
+    .hero-art-label { display:flex; justify-content:space-between; gap:10px; padding:9px 2px 0; font-size:.65rem; text-transform:uppercase; }
+    section { padding:78px 0; border-top:3px solid var(--ink); }
+    .section-head { max-width:780px; margin-bottom:34px; }
+    h2 { margin:10px 0 16px; font-size:clamp(2rem,5vw,3.9rem); line-height:1.08; letter-spacing:-.08em; }
+    .section-head p { max-width:720px; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    .card { border:3px solid var(--ink); padding:23px; min-height:190px; background:transparent; clip-path:polygon(0 0,92% 0,100% 13%,100% 100%,0 100%); }
+    .number { color:var(--orange); font-size:.72rem; letter-spacing:.08em; }
+    .card h3 { margin:17px 0 9px; font-size:1.05rem; }
+    .card p { margin:0; font-size:.82rem; line-height:1.7; font-style:normal; font-weight:400; }
+    .shots { display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:start; }
+    .shot { margin:0; border:3px solid var(--ink); background:#e8dfd0; padding:10px; }
+    .shot img { display:block; width:100%; height:auto; }
+    .shot figcaption { display:flex; justify-content:space-between; gap:12px; padding:10px 2px 1px; font-size:.72rem; text-transform:uppercase; }
+    .shot figcaption span { color:var(--orange); }
+    .install { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+    .install article { padding:20px; border:3px solid var(--ink); min-height:155px; }
+    .install b { display:block; margin-bottom:10px; color:var(--orange); }
+    .install p { margin:0; font-size:.8rem; line-height:1.7; font-style:normal; font-weight:400; }
+    .download-band { background:var(--orange); border:3px solid var(--ink); padding:38px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
+    .download-band h2 { margin:0 0 8px; }
+    .download-band p { margin:0; font-size:.82rem; }
+    .download-band .btn { background:var(--paper); white-space:nowrap; }
+    footer { padding:30px 0 42px; font-size:.72rem; }
+    footer .foot { display:flex; justify-content:space-between; gap:18px; flex-wrap:wrap; }
+    footer a { text-decoration:none; }
+    footer a:hover { color:var(--orange); }
+    @media (max-width:850px) {
+      .hero { grid-template-columns:1fr; gap:38px; padding-top:66px; }
+      .grid { grid-template-columns:repeat(2,1fr); }
+      .shots { grid-template-columns:1fr; }
+      .install { grid-template-columns:1fr; }
+      .download-band { align-items:flex-start; flex-direction:column; padding:26px; }
+    }
+    @media (max-width:520px) {
+      .wrap { width:min(100% - 28px, var(--max)); }
+      .nav-tag { font-size:.6rem; }
+      .grid { grid-template-columns:1fr; }
+      .btn { width:100%; }
+      .actions { display:grid; }
+      h1 { font-size:clamp(3.1rem,17vw,5rem); }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <div class="wordmark">RK<span>T</span>RL</div>
+      <div class="nav-tag">Android / MIDI instrument</div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap hero">
+      <div>
+        <div class="eyebrow">ReKontrol / Android MIDI tool</div>
+        <h1>CONTROL<br><span>THE</span><br>CHAOS.</h1>
+        <p class="lead">A MIDI sequencer and performance controller for Android. Build patterns, shape 128 assignable CC controls and push your sound further with Destroy Mode.</p>
+        <div class="actions">
+          <a class="btn primary" href="https://github.com/Noir-echo/RKTRL/releases/latest/download/RKTRL.apk">↓ &nbsp; DOWNLOAD APK</a>
+          <a class="btn" href="https://github.com/Noir-echo/RKTRL/releases/latest">VIEW RELEASE NOTES ↗</a>
+        </div>
+        <div class="meta">FREE DOWNLOAD &nbsp;·&nbsp; ANDROID &nbsp;·&nbsp; BLUETOOTH MIDI / USB MIDI</div>
+      </div>
+      <div class="hero-art">
+        <img src="assets/screenshot-controls.png" alt="RKTRL — écran de contrôle MIDI avec faders et contrôles CC">
+        <div class="hero-art-label"><span>RKTRL / CONTROL</span><span>128 ASSIGNABLE CC</span></div>
+      </div>
+    </div>
+
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <div class="eyebrow">Built for performance</div>
+          <h2>ONE TOOL.<br>MANY POSSIBILITIES.</h2>
+          <p>From detailed step programming to hands-on MIDI manipulation, RKTRL is designed to keep you moving.</p>
+        </div>
+        <div class="grid">
+          <article class="card"><div class="number">01 / SEQUENCER</div><h3>1024 STEPS</h3><p>Pattern generator, editable steps and flexible sequence building.</p></article>
+          <article class="card"><div class="number">02 / MIDI CONTROL</div><h3>128 ASSIGNABLE CCs</h3><p>Assign and edit MIDI CC controls live using a single fader.</p></article>
+          <article class="card"><div class="number">03 / DESTROY MODE</div><h3>9 PRESETS</h3><p>Push your patterns and MIDI performance into more experimental territory.</p></article>
+          <article class="card"><div class="number">04 / CONNECTIVITY</div><h3>BLUETOOTH + USB MIDI</h3><p>Connect compatible MIDI hardware wirelessly or over USB.</p></article>
+          <article class="card"><div class="number">05 / WORKFLOW</div><h3>SAVE & RELOAD</h3><p>Keep your setups ready and return to your preferred configurations.</p></article>
+          <article class="card"><div class="number">06 / INTERFACE</div><h3>MAKE IT YOURS</h3><p>Customise the interface to suit your own workflow.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <div class="eyebrow">Inside RKTRL</div>
+          <h2>TAKE A CLOSER LOOK.</h2>
+          <p>Two views of the RKTRL interface: hands-on MIDI control and experimental effects performance.</p>
+        </div>
+        <div class="shots">
+          <figure class="shot">
+            <img src="assets/screenshot-controls.png" alt="RKTRL — assignable MIDI CC controls">
+            <figcaption><span>01 / CONTROL</span>128 MIDI CC CONTROLS</figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="assets/screenshot-destroy-mode.png" alt="RKTRL — Destroy Mode effects interface">
+            <figcaption><span>02 / DESTRUCTION</span>LIVE EFFECTS & DESTROY MODE</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="section-head">
+          <div class="eyebrow">Get started</div>
+          <h2>INSTALL IN 3 STEPS.</h2>
+        </div>
+        <div class="install">
+          <article><b>01 / DOWNLOAD</b><p>Tap the download button and save the RKTRL APK file to your Android device.</p></article>
+          <article><b>02 / ALLOW INSTALL</b><p>If Android asks, allow your browser or file manager to install apps from this source.</p></article>
+          <article><b>03 / OPEN RKTRL</b><p>Install the APK, launch the app and connect your compatible MIDI device.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <div class="download-band">
+          <div><h2>READY TO TAKE CONTROL?</h2><p>Download the latest RKTRL Android release.</p></div>
+          <a class="btn" href="https://github.com/Noir-echo/RKTRL/releases/latest/download/RKTRL.apk">DOWNLOAD APK ↓</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <span>© RKTRL / REKONTROL</span>
+      <span><a href="https://github.com/Noir-echo/RKTRL">GITHUB REPOSITORY</a> &nbsp;·&nbsp; <a href="https://github.com/Noir-echo/RKTRL/releases">ALL RELEASES</a></span>
+      <span>SPACE MONO / ANDROID</span>
+    </div>
+  </footer>
+</body>
+</html>

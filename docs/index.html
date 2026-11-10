@@ -1,188 +1,296 @@
 <!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#F3EBDD">
-  <meta name="description" content="RKTRL — séquenceur MIDI et contrôleur créatif pour Android. 1024 steps, 128 contrôles CC assignables et Destroy Mode.">
-  <title>RKTRL — MIDI sequencer & controller for Android</title>
+  <meta name="theme-color" content="#F3EBDE">
+  <meta name="description" content="RKTRL — MIDI controller, 16-track sequencer and live effects for Android. 128 assignable CC, 1024 steps, Destroy Mode, Bluetooth & USB MIDI.">
+  <title>RKTRL — MIDI controller & sequencer for Android</title>
+  <link rel="icon" type="image/svg+xml" href="assets/icon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,700&display=swap" rel="stylesheet">
   <style>
+    /* ------------------------------------------------------------------
+       Même identité que l'appli (interface FIELD) :
+       papier, encre, un seul accent orange, Space Mono, coins biseautés.
+       ------------------------------------------------------------------ */
     :root {
-      --paper: #F3EBDD;
-      --orange: #FF6A00;
+      --paper: #F3EBDE;
+      --paper-2: #EAE1D2;
       --ink: #111111;
-      --muted: #68645d;
-      --line: #171717;
-      --mono: "Space Mono", "Courier New", monospace;
+      --grey: #B9B2A6;
+      --muted: #6B665E;
+      --accent: #FF6A00;
+      --mono: "Space Mono", ui-monospace, "Courier New", monospace;
+      --cut: 12px;
       --max: 1240px;
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      color: var(--ink);
-      background: var(--paper);
-      font-family: var(--mono);
-      font-weight: 700;
-      font-style: italic;
-      line-height: 1.55;
-    }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--mono); line-height: 1.6; }
     a { color: inherit; }
-    .wrap { width: min(var(--max), calc(100% - 48px)); margin: auto; }
-    header { border-bottom: 3px solid var(--ink); background: var(--paper); }
-    .nav { min-height: 76px; display:flex; align-items:center; justify-content:space-between; gap:20px; }
-    .wordmark { font-size: clamp(1.6rem,3vw,2.25rem); letter-spacing:-.08em; }
-    .wordmark span { color:var(--orange); }
-    .nav-tag { font-size:.76rem; text-transform:uppercase; letter-spacing:.08em; }
-    .hero { padding: clamp(64px, 10vw, 126px) 0 88px; display:grid; grid-template-columns: 1.08fr .92fr; gap:52px; align-items:center; }
-    .eyebrow { color:var(--orange); font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; }
-    h1 { margin:18px 0 24px; font-size:clamp(3.4rem, 8.5vw, 7.2rem); line-height:.98; letter-spacing:-.095em; }
-    h1 span { color:var(--orange); }
-    .lead { max-width:680px; font-size:clamp(1rem, 1.5vw, 1.18rem); line-height:1.7; }
-    .actions { display:flex; flex-wrap:wrap; gap:14px; margin-top:34px; }
+    img { max-width: 100%; }
+    :focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .wrap { width: min(var(--max), calc(100% - 32px)); margin: 0 auto; }
+    .label { font-size: .72rem; letter-spacing: .02em; color: var(--muted); }
+
+    /* --- formes biseautées (haut-gauche + bas-droite), comme les boutons de l'appli --- */
+    .bev {
+      --c: var(--cut); --b: 2px; --fill: var(--paper);
+      position: relative; isolation: isolate; background: var(--ink);
+      clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
+    }
+    .bev::before {
+      content: ""; position: absolute; inset: var(--b); z-index: -1; background: var(--fill);
+      clip-path: polygon(calc(var(--c) - var(--b) * .6) 0, 100% 0, 100% calc(100% - var(--c) + var(--b) * .6), calc(100% - var(--c) + var(--b) * .6) 100%, 0 100%, 0 calc(var(--c) - var(--b) * .6));
+    }
+    .bev.solid { --fill: var(--ink); color: var(--paper); }
+    .bev.hot { background: var(--accent); --fill: var(--accent); color: var(--ink); }
+
+    /* --- en-tête : comme la barre du haut de l'appli --- */
+    header { position: sticky; top: 0; z-index: 10; background: var(--paper); border-bottom: 2px solid var(--ink); }
+    .bar { display: flex; align-items: center; gap: 28px; min-height: 64px; }
+    .logo { font-weight: 700; font-style: italic; font-size: 1.6rem; letter-spacing: -.02em; text-decoration: none; }
+    .tabs { display: flex; gap: 22px; flex-wrap: wrap; }
+    .tabs a { position: relative; text-decoration: none; color: var(--muted); font-size: .86rem; padding: 6px 0; }
+    .tabs a:hover, .tabs a.on { color: var(--ink); }
+    .tabs a.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -2px; height: 3px; background: var(--ink); }
+    .status { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: .86rem; white-space: nowrap; }
+    .status .play { color: var(--accent); }
+    .status .sq { display: inline-block; width: 10px; height: 10px; background: var(--accent); margin-right: 8px; animation: blink 1.2s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* --- boutons --- */
     .btn {
-      min-height:62px; padding:14px 25px; display:inline-flex; justify-content:center; align-items:center;
-      text-decoration:none; text-align:center; font:700 italic clamp(.86rem,1.5vw,1rem) var(--mono);
-      border:3px solid var(--ink); background:var(--paper); color:var(--ink);
-      clip-path:polygon(12% 0,100% 0,100% 78%,88% 100%,0 100%,0 22%);
-      transition:transform .16s ease, background .16s ease, color .16s ease;
+      --c: 10px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+      min-height: 56px; padding: 0 26px; font: 700 .95rem var(--mono); letter-spacing: .02em; text-decoration: none; text-transform: uppercase;
     }
-    .btn.primary { background:var(--orange); }
-    .btn:hover { transform:translateY(-3px); background:var(--ink); color:var(--paper); }
-    .btn.primary:hover { background:var(--ink); color:var(--orange); }
-    .meta { margin-top:18px; font-size:.75rem; color:var(--muted); }
-    .hero-art { position:relative; border:3px solid var(--ink); padding:12px; background:#e8dfd0; box-shadow:12px 12px 0 var(--orange); }
-    .hero-art img { display:block; width:100%; height:auto; }
-    .hero-art-label { display:flex; justify-content:space-between; gap:10px; padding:9px 2px 0; font-size:.65rem; text-transform:uppercase; }
-    section { padding:78px 0; border-top:3px solid var(--ink); }
-    .section-head { max-width:780px; margin-bottom:34px; }
-    h2 { margin:10px 0 16px; font-size:clamp(2rem,5vw,3.9rem); line-height:1.08; letter-spacing:-.08em; }
-    .section-head p { max-width:720px; }
-    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
-    .card { border:3px solid var(--ink); padding:23px; min-height:190px; background:transparent; clip-path:polygon(0 0,92% 0,100% 13%,100% 100%,0 100%); }
-    .number { color:var(--orange); font-size:.72rem; letter-spacing:.08em; }
-    .card h3 { margin:17px 0 9px; font-size:1.05rem; }
-    .card p { margin:0; font-size:.82rem; line-height:1.7; font-style:normal; font-weight:400; }
-    .shots { display:grid; grid-template-columns:1fr 1fr; gap:22px; align-items:start; }
-    .shot { margin:0; border:3px solid var(--ink); background:#e8dfd0; padding:10px; }
-    .shot img { display:block; width:100%; height:auto; }
-    .shot figcaption { display:flex; justify-content:space-between; gap:12px; padding:10px 2px 1px; font-size:.72rem; text-transform:uppercase; }
-    .shot figcaption span { color:var(--orange); }
-    .install { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
-    .install article { padding:20px; border:3px solid var(--ink); min-height:155px; }
-    .install b { display:block; margin-bottom:10px; color:var(--orange); }
-    .install p { margin:0; font-size:.8rem; line-height:1.7; font-style:normal; font-weight:400; }
-    .download-band { background:var(--orange); border:3px solid var(--ink); padding:38px; display:flex; align-items:center; justify-content:space-between; gap:24px; }
-    .download-band h2 { margin:0 0 8px; }
-    .download-band p { margin:0; font-size:.82rem; }
-    .download-band .btn { background:var(--paper); white-space:nowrap; }
-    footer { padding:30px 0 42px; font-size:.72rem; }
-    footer .foot { display:flex; justify-content:space-between; gap:18px; flex-wrap:wrap; }
-    footer a { text-decoration:none; }
-    footer a:hover { color:var(--orange); }
-    @media (max-width:850px) {
-      .hero { grid-template-columns:1fr; gap:38px; padding-top:66px; }
-      .grid { grid-template-columns:repeat(2,1fr); }
-      .shots { grid-template-columns:1fr; }
-      .install { grid-template-columns:1fr; }
-      .download-band { align-items:flex-start; flex-direction:column; padding:26px; }
+    .btn .ico { color: var(--accent); }
+    .btn.hot .ico { color: var(--ink); }
+    .btn:hover { --fill: var(--ink); color: var(--paper); }
+    .btn.hot:hover { background: var(--ink); --fill: var(--ink); color: var(--accent); }
+    .btn.hot:hover .ico { color: var(--accent); }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 12px; }
+
+    /* rayures « danger » (DESTROY MODE / KILL) : accent + papier, plaque centrale */
+    .hazard {
+      --c: 12px; display: inline-flex; padding: 9px 14px; text-decoration: none;
+      background: repeating-linear-gradient(-45deg, var(--accent) 0 9px, var(--paper) 9px 18px);
+      clip-path: polygon(var(--c) 0, 100% 0, 100% calc(100% - var(--c)), calc(100% - var(--c)) 100%, 0 100%, 0 var(--c));
     }
-    @media (max-width:520px) {
-      .wrap { width:min(100% - 28px, var(--max)); }
-      .nav-tag { font-size:.6rem; }
-      .grid { grid-template-columns:1fr; }
-      .btn { width:100%; }
-      .actions { display:grid; }
-      h1 { font-size:clamp(3.1rem,17vw,5rem); }
+    .hazard span { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 48px; padding: 0 30px; background: var(--paper); font: 700 1rem var(--mono); text-transform: uppercase; }
+    .hazard:hover span { background: var(--ink); color: var(--paper); }
+
+    /* --- hero --- */
+    .hero { display: grid; grid-template-columns: 1fr 1.15fr; gap: 48px; align-items: center; padding: 64px 0 56px; }
+    .hero h1 { margin: 10px 0 18px; font-weight: 700; font-style: italic; font-size: clamp(3.4rem, 9vw, 7.4rem); line-height: .92; letter-spacing: -.04em; }
+    .hero h1 em { color: var(--accent); font-style: italic; }
+    .hero p.lead { max-width: 560px; margin: 0 0 30px; font-size: 1rem; }
+    .meta { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .72rem; color: var(--muted); }
+    .meta b { color: var(--ink); }
+    .frame { --c: 18px; padding: 12px; }
+    .frame img { display: block; width: 100%; height: auto; }
+    .frame figcaption { display: flex; justify-content: space-between; gap: 10px; padding: 10px 4px 2px; font-size: .72rem; }
+    .frame figcaption span { color: var(--accent); }
+
+    /* --- compteurs façon boutons de valeur de l'appli --- */
+    .knobs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 8px 0 56px; }
+    .knob { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+    .knob .dial { position: relative; width: 132px; height: 132px; }
+    .knob svg { position: absolute; inset: 0; }
+    .knob .val { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.7rem; }
+    .knob .num { position: absolute; left: 0; top: -2px; font-size: .62rem; color: var(--muted); }
+    .knob .name { --c: 6px; display: block; width: 100%; max-width: 190px; padding: 4px 8px; font-weight: 700; font-size: .78rem; text-transform: uppercase; }
+
+    /* --- sections --- */
+    section { padding: 64px 0; border-top: 2px solid var(--ink); }
+    .sec-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 26px; }
+    .sec-head .mark { width: 6px; height: 22px; background: var(--ink); align-self: center; }
+    h2 { margin: 0; font-weight: 700; font-size: clamp(1.6rem, 3.6vw, 2.6rem); letter-spacing: -.02em; line-height: 1.1; }
+    .intro { max-width: 720px; margin: -8px 0 30px; color: var(--muted); }
+
+    /* --- grille de « pas » (fonctionnalités) : comme la grille du séquenceur --- */
+    .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .step { --c: 12px; display: flex; flex-direction: column; min-height: 210px; padding: 12px 14px 14px; transition: background .15s, color .15s; }
+    .step .top { display: flex; justify-content: space-between; font-size: .7rem; }
+    .step h3 { margin: auto 0 6px; font-size: 1.25rem; line-height: 1.15; text-transform: uppercase; }
+    .step p { margin: 0; font-size: .8rem; line-height: 1.55; }
+    .step .tie { height: 4px; margin-top: 12px; background: transparent; }
+    .step.solid .tie { background: var(--accent); }
+    .step.solid p { color: #d8d0c2; }
+    .step.play { background: var(--accent); --fill: var(--accent); color: var(--ink); }
+    .step.play p { color: var(--ink); }
+
+    /* --- écrans : onglets comme l'en-tête de l'appli --- */
+    .screen-tabs { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .screen-tabs button { --c: 8px; min-height: 44px; padding: 0 20px; border: 0; cursor: pointer; font: 700 .85rem var(--mono); color: var(--ink); }
+    .screen-tabs button[aria-selected="true"] { --fill: var(--ink); color: var(--paper); }
+    .screen-tabs button:hover:not([aria-selected="true"]) { --fill: var(--paper-2); }
+    .screen[hidden] { display: none; }
+    .screen-notes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+    .screen-notes div { --c: 8px; padding: 12px 14px; font-size: .78rem; }
+    .screen-notes b { display: block; margin-bottom: 4px; }
+
+    /* --- installation --- */
+    .install { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .install article { --c: 12px; padding: 16px 18px 20px; min-height: 160px; }
+    .install .n { font-size: .7rem; color: var(--muted); }
+    .install h3 { margin: 6px 0 8px; font-size: 1.05rem; text-transform: uppercase; }
+    .install p { margin: 0; font-size: .82rem; }
+    .install article.solid .n { color: var(--accent); }
+    .install article.solid p { color: #d8d0c2; }
+
+    .final { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 22px; padding: 30px; --c: 18px; }
+    .final h2 { font-size: clamp(1.5rem, 3.4vw, 2.3rem); }
+    .final p { margin: 6px 0 0; color: var(--muted); font-size: .85rem; }
+
+    /* --- pied de page : comme la barre du bas --- */
+    footer { border-top: 2px solid var(--ink); padding: 18px 0 28px; }
+    .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+    .foot .btn { min-height: 46px; padding: 0 18px; font-size: .8rem; }
+    .foot small { margin-left: auto; font-size: .7rem; color: var(--muted); }
+
+    @media (max-width: 960px) {
+      .hero { grid-template-columns: 1fr; gap: 36px; padding-top: 40px; }
+      .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .knobs { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 28px; }
+      .screen-notes, .install { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .tabs { display: none; }
+      .status .bpm { display: none; }
+      .steps { grid-template-columns: 1fr; }
+      .step { min-height: 170px; }
+      .btn, .hazard { width: 100%; }
+      .foot small { margin-left: 0; width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .status .sq { animation: none; }
     }
   </style>
 </head>
 <body>
+
   <header>
-    <div class="wrap nav">
-      <div class="wordmark">RK<span>T</span>RL</div>
-      <div class="nav-tag">Android / MIDI instrument</div>
+    <div class="wrap bar">
+      <a class="logo" href="#top" aria-label="RKTRL — back to top">RKTRL</a>
+      <nav class="tabs" aria-label="Sections">
+        <a href="#top" class="on">home / 00</a>
+        <a href="#features">feat / 01</a>
+        <a href="#screens">screens / 02</a>
+        <a href="#install">install / 03</a>
+      </nav>
+      <div class="status" aria-hidden="true">
+        <span class="bpm"><span class="play">▶</span>&nbsp; ♩ <span id="bpm">135</span></span>
+        <span><span class="sq"></span>android midi</span>
+      </div>
     </div>
   </header>
 
-  <main>
+  <main id="top">
     <div class="wrap hero">
       <div>
-        <div class="eyebrow">ReKontrol / Android MIDI tool</div>
-        <h1>CONTROL<br><span>THE</span><br>CHAOS.</h1>
-        <p class="lead">A MIDI sequencer and performance controller for Android. Build patterns, shape 128 assignable CC controls and push your sound further with Destroy Mode.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://github.com/Noir-echo/RKTRL/releases/latest/download/RKTRL.apk">↓ &nbsp; DOWNLOAD APK</a>
-          <a class="btn" href="https://github.com/Noir-echo/RKTRL/releases/latest">VIEW RELEASE NOTES ↗</a>
+        <div class="label">ReKontrol · MIDI controller + sequencer for Android</div>
+        <h1>CONTROL<br><em>THE</em><br>CHAOS.</h1>
+        <p class="lead">Shape your synths with 128 assignable CC controls, build patterns on a 16-track step sequencer, then tear them apart live in Destroy Mode. Over Bluetooth MIDI or USB.</p>
+        <div class="btn-row">
+          <a class="btn bev hot" href="https://github.com/Noir-echo/RKTRL/releases/latest/download/RKTRL.apk"><span class="ico">↓</span> Download APK</a>
+          <a class="btn bev" href="https://github.com/Noir-echo/RKTRL/releases/latest"><span class="ico">↗</span> Release notes</a>
         </div>
-        <div class="meta">FREE DOWNLOAD &nbsp;·&nbsp; ANDROID &nbsp;·&nbsp; BLUETOOTH MIDI / USB MIDI</div>
+        <div class="meta"><span><b>FREE</b></span><span>ANDROID 8+</span><span>BLUETOOTH MIDI</span><span>USB MIDI</span></div>
       </div>
-      <div class="hero-art">
-        <img src="assets/screenshot-controls.png" alt="RKTRL — écran de contrôle MIDI avec faders et contrôles CC">
-        <div class="hero-art-label"><span>RKTRL / CONTROL</span><span>128 ASSIGNABLE CC</span></div>
+      <figure class="frame bev" style="margin:0">
+        <img src="assets/screen-controller.jpg" width="1920" height="1160" alt="RKTRL controller page: 32 assignable knobs, info panel and fader">
+        <figcaption><span>ctrl / 01</span>128 ASSIGNABLE CC</figcaption>
+      </figure>
+    </div>
+
+    <!-- compteurs, dessinés comme les boutons de valeur de l'appli -->
+    <div class="wrap knobs" aria-label="Key numbers">
+      <div class="knob">
+        <div class="dial"><svg viewBox="0 0 132 132" aria-hidden="true"><circle cx="66" cy="66" r="58" fill="none" stroke="#B9B2A6" stroke-width="2" stroke-dasharray="273.3 400" transform="rotate(135 66 66)"/><circle cx="66" cy="66" r="58" fill="none" stroke="#111" stroke-width="7" stroke-dasharray="273.3 400" transform="rotate(135 66 66)"/><circle cx="66" cy="66" r="43" fill="#F3EBDE" stroke="#111" stroke-width="2"/></svg><span class="val">128</span><span class="num">001</span></div>
+        <span class="name bev">CC controls</span>
+      </div>
+      <div class="knob">
+        <div class="dial"><svg viewBox="0 0 132 132" aria-hidden="true"><circle cx="66" cy="66" r="58" fill="none" stroke="#B9B2A6" stroke-width="2" stroke-dasharray="273.3 400" transform="rotate(135 66 66)"/><circle cx="66" cy="66" r="58" fill="none" stroke="#FF6A00" stroke-width="7" stroke-dasharray="273.3 400" transform="rotate(135 66 66)"/><circle cx="66" cy="66" r="43" fill="#FF6A00" stroke="#111" stroke-width="2"/></svg><span class="val">1024</span><span class="num">002</span></div>
+        <span class="name bev">steps / track</span>
+      </div>
+      <div class="knob">
+        <div class="dial"><svg viewBox="0 0 132 132" aria-hidden="true"><circle cx="66" cy="66" r="58" fill="none" stroke="#B9B2A6" stroke-width="2" stroke-dasharray="273.3 400" transform="rotate(135 66 66)"/><circle cx="66" cy="66" r="58" fill="none" stroke="#111" stroke-width="7" stroke-dasharray="136.7 400" transform="rotate(135 66 66)"/><circle cx="66" cy="66" r="43" fill="#F3EBDE" stroke="#111" stroke-width="2"/></svg><span class="val">16</span><span class="num">003</span></div>
+        <span class="name bev">tracks</span>
+      </div>
+      <div class="knob">
+        <div class="dial"><svg viewBox="0 0 132 132" aria-hidden="true"><circle cx="66" cy="66" r="58" fill="none" stroke="#B9B2A6" stroke-width="2" stroke-dasharray="273.3 400" transform="rotate(135 66 66)"/><circle cx="66" cy="66" r="58" fill="none" stroke="#111" stroke-width="7" stroke-dasharray="76.9 400" transform="rotate(135 66 66)"/><circle cx="66" cy="66" r="43" fill="#F3EBDE" stroke="#111" stroke-width="2"/></svg><span class="val">9</span><span class="num">004</span></div>
+        <span class="name bev">live effects</span>
       </div>
     </div>
 
-    <section>
+    <section id="features">
       <div class="wrap">
-        <div class="section-head">
-          <div class="eyebrow">Built for performance</div>
-          <h2>ONE TOOL.<br>MANY POSSIBILITIES.</h2>
-          <p>From detailed step programming to hands-on MIDI manipulation, RKTRL is designed to keep you moving.</p>
-        </div>
-        <div class="grid">
-          <article class="card"><div class="number">01 / SEQUENCER</div><h3>1024 STEPS</h3><p>Pattern generator, editable steps and flexible sequence building.</p></article>
-          <article class="card"><div class="number">02 / MIDI CONTROL</div><h3>128 ASSIGNABLE CCs</h3><p>Assign and edit MIDI CC controls live using a single fader.</p></article>
-          <article class="card"><div class="number">03 / DESTROY MODE</div><h3>9 PRESETS</h3><p>Push your patterns and MIDI performance into more experimental territory.</p></article>
-          <article class="card"><div class="number">04 / CONNECTIVITY</div><h3>BLUETOOTH + USB MIDI</h3><p>Connect compatible MIDI hardware wirelessly or over USB.</p></article>
-          <article class="card"><div class="number">05 / WORKFLOW</div><h3>SAVE & RELOAD</h3><p>Keep your setups ready and return to your preferred configurations.</p></article>
-          <article class="card"><div class="number">06 / INTERFACE</div><h3>MAKE IT YOURS</h3><p>Customise the interface to suit your own workflow.</p></article>
+        <div class="sec-head"><span class="mark"></span><h2>ONE TOOL. MANY POSSIBILITIES.</h2></div>
+        <p class="intro">Each block is a step: the orange one is the playhead.</p>
+        <div class="steps" id="steps">
+          <article class="step bev solid"><div class="top"><span>1</span><span>CTRL</span></div><h3>128 assignable CC</h3><p>4 banks of 32 knobs. Channel, CC and range per knob, one fader with soft takeover — or FORCE to jump straight to the value.</p><div class="tie"></div></article>
+          <article class="step bev"><div class="top"><span>2</span><span>SEQ</span></div><h3>16 tracks · 1024 steps</h3><p>Note, velocity, length, chords, trig conditions and ratchets on every step. Pages A / B for live variations.</p><div class="tie"></div></article>
+          <article class="step bev solid"><div class="top"><span>3</span><span>GEN</span></div><h3>Auto · Euclid · Random</h3><p>Generate basslines, acid, pads, riffs, solos… or euclidean rhythms with two combined layers.</p><div class="tie"></div></article>
+          <article class="step bev"><div class="top"><span>4</span><span>EXPR</span></div><h3>Step expression</h3><p>Long-press a step for pan, modulation, pitch bend, accent and slide.</p><div class="tie"></div></article>
+          <article class="step bev solid"><div class="top"><span>5</span><span>DSTR</span></div><h3>Destroy Mode</h3><p>An X/Y pad driving 9 live MIDI effects — repeat, stutter, echo, filter, tape stop, warp… — with hypnotic visuals.</p><div class="tie"></div></article>
+          <article class="step bev"><div class="top"><span>6</span><span>PADS</span></div><h3>Pads + tap tempo</h3><p>8 assignable pads to play any note on any channel, and TAP BPM to lock the tempo by ear.</p><div class="tie"></div></article>
+          <article class="step bev solid"><div class="top"><span>7</span><span>LINK</span></div><h3>Bluetooth + USB MIDI</h3><p>Connect wireless BLE-MIDI gear or plug in over USB. MIDI clock out included.</p><div class="tie"></div></article>
+          <article class="step bev"><div class="top"><span>8</span><span>SAVE</span></div><h3>Save & make it yours</h3><p>Back up your whole setup to a file, name your MIDI channels, pick your background and accent colours.</p><div class="tie"></div></article>
         </div>
       </div>
     </section>
 
-    <section>
+    <section id="screens">
       <div class="wrap">
-        <div class="section-head">
-          <div class="eyebrow">Inside RKTRL</div>
-          <h2>TAKE A CLOSER LOOK.</h2>
-          <p>Two views of the RKTRL interface: hands-on MIDI control and experimental effects performance.</p>
+        <div class="sec-head"><span class="mark"></span><h2>TAKE A CLOSER LOOK.</h2></div>
+        <div class="screen-tabs" role="tablist" aria-label="App pages">
+          <button class="bev" role="tab" id="tab-ctrl" aria-controls="scr-ctrl" aria-selected="true">ctrl / 01</button>
+          <button class="bev" role="tab" id="tab-seq" aria-controls="scr-seq" aria-selected="false" tabindex="-1">seq / 02</button>
+          <button class="bev" role="tab" id="tab-dstr" aria-controls="scr-dstr" aria-selected="false" tabindex="-1">dstr / 03</button>
         </div>
-        <div class="shots">
-          <figure class="shot">
-            <img src="assets/screenshot-controls.png" alt="RKTRL — assignable MIDI CC controls">
-            <figcaption><span>01 / CONTROL</span>128 MIDI CC CONTROLS</figcaption>
-          </figure>
-          <figure class="shot">
-            <img src="assets/screenshot-destroy-mode.png" alt="RKTRL — Destroy Mode effects interface">
-            <figcaption><span>02 / DESTRUCTION</span>LIVE EFFECTS & DESTROY MODE</figcaption>
-          </figure>
+        <figure class="frame bev screen" id="scr-ctrl" role="tabpanel" aria-labelledby="tab-ctrl" style="margin:0">
+          <img src="assets/screen-controller.jpg" width="1920" height="1160" loading="lazy" alt="Controller: knobs with value arcs, selected knobs in orange, group info panel and fader">
+          <figcaption><span>ctrl / 01</span>CONTROLLER · 32 KNOBS × 4 BANKS</figcaption>
+        </figure>
+        <figure class="frame bev screen" id="scr-seq" role="tabpanel" aria-labelledby="tab-seq" style="margin:0" hidden>
+          <img src="assets/screen-sequencer.jpg" width="1920" height="1160" loading="lazy" alt="Sequencer: 16 tracks on the left, step grid with chords, track settings on the right">
+          <figcaption><span>seq / 02</span>SEQUENCER · 16 TRACKS</figcaption>
+        </figure>
+        <figure class="frame bev screen" id="scr-dstr" role="tabpanel" aria-labelledby="tab-dstr" style="margin:0" hidden>
+          <img src="assets/screen-destroy.jpg" width="1920" height="1160" loading="lazy" alt="Destroy Mode: MIDI channels on the left, X/Y pad with geometric animation, effects and tap tempo on the right">
+          <figcaption><span>dstr / 03</span>DESTROY MODE · X/Y PAD</figcaption>
+        </figure>
+        <div class="screen-notes">
+          <div class="bev"><b>No value jumps</b>The fader picks up each parameter where your synth really is.</div>
+          <div class="bev"><b>Polymetric</b>Each track has its own length, division and play direction.</div>
+          <div class="bev"><b>Back to zero</b>In Destroy Mode, everything returns to normal the moment you lift your finger.</div>
         </div>
       </div>
     </section>
 
-    <section>
+    <section id="install">
       <div class="wrap">
-        <div class="section-head">
-          <div class="eyebrow">Get started</div>
-          <h2>INSTALL IN 3 STEPS.</h2>
-        </div>
+        <div class="sec-head"><span class="mark"></span><h2>INSTALL IN 3 STEPS.</h2></div>
         <div class="install">
-          <article><b>01 / DOWNLOAD</b><p>Tap the download button and save the RKTRL APK file to your Android device.</p></article>
-          <article><b>02 / ALLOW INSTALL</b><p>If Android asks, allow your browser or file manager to install apps from this source.</p></article>
-          <article><b>03 / OPEN RKTRL</b><p>Install the APK, launch the app and connect your compatible MIDI device.</p></article>
+          <article class="bev solid"><div class="n">01 / DOWNLOAD</div><h3>Get the APK</h3><p>Tap Download APK on your Android phone or tablet.</p></article>
+          <article class="bev"><div class="n">02 / ALLOW</div><h3>Allow the install</h3><p>If Android asks, allow your browser or file manager to install apps from this source.</p></article>
+          <article class="bev"><div class="n">03 / CONNECT</div><h3>Open RKTRL</h3><p>Tap the link area at the top right to connect your Bluetooth or USB MIDI gear.</p></article>
         </div>
       </div>
     </section>
 
     <section>
       <div class="wrap">
-        <div class="download-band">
-          <div><h2>READY TO TAKE CONTROL?</h2><p>Download the latest RKTRL Android release.</p></div>
-          <a class="btn" href="https://github.com/Noir-echo/RKTRL/releases/latest/download/RKTRL.apk">DOWNLOAD APK ↓</a>
+        <div class="final bev">
+          <div>
+            <h2>READY TO TAKE CONTROL?</h2>
+            <p>Free download · latest Android release.</p>
+          </div>
+          <a class="hazard" href="https://github.com/Noir-echo/RKTRL/releases/latest/download/RKTRL.apk"><span><span style="color:var(--accent)">↓</span> Download APK</span></a>
         </div>
       </div>
     </section>
@@ -190,10 +298,58 @@
 
   <footer>
     <div class="wrap foot">
-      <span>© RKTRL / REKONTROL</span>
-      <span><a href="https://github.com/Noir-echo/RKTRL">GITHUB REPOSITORY</a> &nbsp;·&nbsp; <a href="https://github.com/Noir-echo/RKTRL/releases">ALL RELEASES</a></span>
-      <span>SPACE MONO / ANDROID</span>
+      <a class="btn bev" href="https://github.com/Noir-echo/RKTRL">GitHub</a>
+      <a class="btn bev" href="https://github.com/Noir-echo/RKTRL/releases">All releases</a>
+      <small>© RKTRL / REKONTROL · Space Mono, SIL Open Font License</small>
     </div>
   </footer>
+
+  <script>
+    // Onglets des captures (clavier : flèches gauche / droite)
+    (function () {
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('.screen-tabs [role="tab"]'));
+      function select(t) {
+        tabs.forEach(function (x) {
+          var on = x === t;
+          x.setAttribute('aria-selected', on);
+          x.tabIndex = on ? 0 : -1;
+          document.getElementById(x.getAttribute('aria-controls')).hidden = !on;
+        });
+      }
+      tabs.forEach(function (t, i) {
+        t.addEventListener('click', function () { select(t); });
+        t.addEventListener('keydown', function (e) {
+          if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+          var n = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+          select(n); n.focus();
+        });
+      });
+    })();
+
+    // Tête de lecture : un bloc passe en orange à chaque temps (135 BPM), comme dans le séquenceur
+    (function () {
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var steps = document.querySelectorAll('#steps .step');
+      var i = 0;
+      setInterval(function () {
+        steps.forEach(function (s) { s.classList.remove('play'); });
+        steps[i % steps.length].classList.add('play');
+        i++;
+      }, Math.round(60000 / 135));
+    })();
+
+    // Onglet actif dans l'en-tête selon la section visible
+    (function () {
+      var links = Array.prototype.slice.call(document.querySelectorAll('.tabs a'));
+      var ids = ['top', 'features', 'screens', 'install'];
+      function update() {
+        var y = window.scrollY + 140, cur = 'top';
+        ids.forEach(function (id) { var el = document.getElementById(id); if (el && el.offsetTop <= y) cur = id; });
+        links.forEach(function (a) { a.classList.toggle('on', a.getAttribute('href') === '#' + cur); });
+      }
+      window.addEventListener('scroll', update, { passive: true });
+      update();
+    })();
+  </script>
 </body>
 </html>

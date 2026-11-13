@@ -38,7 +38,9 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
     private lateinit var stCh: Stepper
     private lateinit var stLen: Stepper
     private lateinit var stDiv: Stepper
-    private lateinit var stDir: Stepper
+    private lateinit var btnSeq: TdrButton
+    private enum class Pick { NONE, START, END, BOTH_START, BOTH_END, SOLO }
+    private var pick = Pick.NONE
     private lateinit var stTr: Stepper
     private lateinit var stTempo: Stepper
     private lateinit var btnA: TdrButton
@@ -180,14 +182,19 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
         stCh = Stepper(c, tr("CANAL MIDI", "MIDI CHANNEL"), 1, 16, tr.channel, fmt = { Settings.channelLabel(it) },
             onChange = { tr.channel = it; tr.releaseRequest = true; tabs.invalidate() }, compact = true)
         stLen = Stepper(c, tr("LONGUEUR (1–1024)", "LENGTH (1–1024)"), 1, MAX_STEPS, tr.length, editable = true,
-            onChange = { tr.length = it; refreshPageNav(); grid.invalidate(); tabs.invalidate() }, compact = true)
+            onChange = {
+                tr.length = it
+                if (tr.start > it - 1) tr.start = it - 1
+                if (tr.solo > it - 1) tr.solo = -1
+                refreshPageNav(); grid.invalidate(); tabs.invalidate()
+            }, compact = true)
         stDiv = Stepper(c, "DIVISION", 0, Divs.labels.size - 1, tr.div, fmt = { Divs.labels[it] },
             onChange = { tr.div = it }, compact = true)
-        stDir = Stepper(c, tr("SENS DE LECTURE", "PLAY DIRECTION"), 0, 3, tr.dir, fmt = { Dirs.labels()[it] },
-            onChange = { tr.dir = it }, compact = true, valueColor = Tdr.ACCENT)
         stTr = Stepper(c, tr("TRANSPO (±1024)", "TRANSPOSE (±1024)"), -1024, 1024, tr.transpose, editable = true,
             onChange = { tr.transpose = it; grid.invalidate() }, compact = true)
-        add(stCh, 40); add(stLen, 40); add(stDiv, 40); add(stDir, 40); add(stTr, 40)
+        add(stCh, 40); add(stLen, 40); add(stDiv, 40); add(stTr, 40)
+        btnSeq = TdrButton(c, "SEQ", Tdr.YELLOW).onClick { if (pick != Pick.NONE) setPick(Pick.NONE) else showSeqDialog() }
+        add(btnSeq, 34)
 
         btnA = TdrButton(c, "PAGE A", Tdr.CYAN).onClick { setAB(0) }
         btnB = TdrButton(c, "PAGE B", Tdr.CYAN).onClick { setAB(1) }
@@ -304,7 +311,7 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
         stCh.update(tr.channel, false)
         stLen.update(tr.length, false)
         stDiv.update(tr.div, false)
-        stDir.update(tr.dir, false)
+        setPick(Pick.NONE)
         stTr.update(tr.transpose, false)
         btnA.active = tr.page == 0
         btnB.active = tr.page == 1
@@ -362,6 +369,81 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
             ui.removeCallbacks(disarm); disarm.run()
             refreshTrack()
         }
+    }
+
+    // ------------------------------------------------------------ SEQ : sens, début, fin, solo
+    private fun setPick(m: Pick) {
+        pick = m
+        btnSeq.text = when (m) {
+            Pick.NONE -> if (tr.solo >= 0) "SEQ · SOLO ${tr.solo + 1}" else "SEQ"
+            Pick.START, Pick.BOTH_START -> tr("▸ TOUCHE LE DÉBUT", "▸ TAP THE START")
+            Pick.END, Pick.BOTH_END -> tr("▸ TOUCHE LA FIN", "▸ TAP THE END")
+            Pick.SOLO -> tr("▸ TOUCHE LE PAS SOLO", "▸ TAP THE SOLO STEP")
+        }
+        btnSeq.accent = if (m == Pick.NONE) Tdr.YELLOW else Tdr.ACCENT
+        btnSeq.active = m != Pick.NONE
+        grid.onPick = if (m == Pick.NONE) null else { i -> onPicked(i) }
+        grid.invalidate()
+    }
+
+    private fun onPicked(i: Int) {
+        when (pick) {
+            Pick.START, Pick.BOTH_START -> {
+                tr.start = i
+                if (tr.length - 1 < i) tr.length = i + 1
+                if (pick == Pick.BOTH_START) { setPick(Pick.BOTH_END); return }
+            }
+            Pick.END, Pick.BOTH_END -> {
+                tr.length = i + 1
+                if (tr.start > i) tr.start = i
+            }
+            Pick.SOLO -> tr.solo = i
+            Pick.NONE -> {}
+        }
+        stLen.update(tr.length, false)
+        refreshPageNav()
+        tabs.invalidate()
+        setPick(Pick.NONE)
+    }
+
+    private fun showSeqDialog() {
+        val c: Context = act
+        val d = TdrDialog(c, tr("SEQ // PISTE ${current + 1}", "SEQ // TRACK ${current + 1}"))
+        d.section(tr("SENS DE LECTURE", "PLAY DIRECTION"))
+        d.body.addView(choiceGrid(c, Dirs.labels(), 4, tr.dir, Tdr.ACCENT) { tr.dir = it })
+
+        d.section(tr("BOUCLE", "LOOP"))
+        d.note(tr("Début : pas ${tr.start + 1} · Fin : pas ${tr.length}. Choisis, puis touche la case voulue dans la grille.",
+            "Start: step ${tr.start + 1} · End: step ${tr.length}. Choose, then tap the step in the grid."))
+        val row = LinearLayout(c)
+        row.orientation = LinearLayout.HORIZONTAL
+        listOf(tr("DÉBUT", "START") to Pick.START, tr("FIN", "END") to Pick.END, tr("DÉBUT + FIN", "START + END") to Pick.BOTH_START)
+            .forEachIndexed { k, (label, m) ->
+                val b = TdrButton(c, label, Tdr.YELLOW).onClick { d.dismiss(); setPick(m) }
+                val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                if (k < 2) lp.rightMargin = c.dpi(6)
+                row.addView(b, lp)
+            }
+        d.row(row, 40)
+        d.button(tr("BOUCLE ENTIÈRE (DU PAS 1)", "WHOLE LOOP (FROM STEP 1)"), Tdr.YELLOW) {
+            tr.start = 0; grid.invalidate(); d.dismiss()
+        }
+
+        d.section("SOLO")
+        d.note(tr("Seul le pas choisi joue ; les autres se taisent, le rythme continue.",
+            "Only the chosen step plays; the others go silent, the timing keeps running."))
+        val row2 = LinearLayout(c)
+        row2.orientation = LinearLayout.HORIZONTAL
+        val bSolo = TdrButton(c, tr("CHOISIR LE PAS", "PICK THE STEP"), Tdr.YELLOW).onClick { d.dismiss(); setPick(Pick.SOLO) }
+        val bOff = TdrButton(c, tr("SOLO OFF", "SOLO OFF"), Tdr.YELLOW).onClick { tr.solo = -1; setPick(Pick.NONE); d.dismiss() }
+        bOff.isEnabled = tr.solo >= 0
+        val l1 = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f); l1.rightMargin = c.dpi(6)
+        row2.addView(bSolo, l1)
+        row2.addView(bOff, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        d.row(row2, 40)
+
+        d.action(tr("FERMER", "CLOSE"), Tdr.DIM) { d.dismiss() }
+        d.show()
     }
 
     // ------------------------------------------------------------ MODE AVANCÉ D'UN PAS (appui long)

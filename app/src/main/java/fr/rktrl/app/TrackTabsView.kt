@@ -87,7 +87,8 @@ class TrackTabsView(
             p.typeface = Tdr.font
             p.textSize = minOf(dp(12), ch * 0.40f)
             var txt = label(i)
-            while (txt.length > 1 && p.measureText(txt) > (r - l) - dp(10)) txt = txt.dropLast(1)
+            val room = (r - l) - dp(10) - (if (dim) minOf(dp(18), (b - t) * 0.42f) + dp(4) else 0f)
+            while (txt.length > 1 && p.measureText(txt) > room) txt = txt.dropLast(1)
             p.color = if (on) Tdr.BG else if (dim) Tdr.DIM else Tdr.WHITE
             canvas.drawText(txt, l + dp(5), b - dp(5), p)
 
@@ -95,13 +96,36 @@ class TrackTabsView(
                 p.color = if (on) Tdr.BG else c
                 canvas.drawRect(r - dp(8), t + dp(4), r - dp(4), t + dp(8), p)
             }
-            if (dim) {
-                p.textAlign = Paint.Align.RIGHT
-                p.typeface = Tdr.mono
-                p.textSize = dp(8)
-                p.color = if (on) Tdr.BG else Tdr.MAGENTA
-                canvas.drawText("M", r - dp(10), t + dp(9), p)
-            }
+            if (dim) drawMuted(canvas, r - dp(6), (t + b) / 2, minOf(dp(18), (b - t) * 0.42f))
         }
+    }
+
+    /** Piste muette : enceinte barrée, en couleur d'accent, calée à droite de la case. */
+    private val icon = Path()
+    private fun drawMuted(canvas: Canvas, right: Float, cy: Float, size: Float) {
+        val x0 = right - size
+        val hs = size / 2
+        icon.reset()
+        icon.moveTo(x0, cy - hs * 0.32f)
+        icon.lineTo(x0 + size * 0.26f, cy - hs * 0.32f)
+        icon.lineTo(x0 + size * 0.6f, cy - hs * 0.85f)
+        icon.lineTo(x0 + size * 0.6f, cy + hs * 0.85f)
+        icon.lineTo(x0 + size * 0.26f, cy + hs * 0.32f)
+        icon.lineTo(x0, cy + hs * 0.32f)
+        icon.close()
+        p.style = Paint.Style.FILL
+        p.color = Tdr.ACCENT
+        canvas.drawPath(icon, p)
+        // barre en travers (bord papier pour bien la détacher)
+        p.style = Paint.Style.STROKE
+        p.strokeCap = Paint.Cap.SQUARE
+        p.strokeWidth = dp(4)
+        p.color = Tdr.BG
+        canvas.drawLine(x0 - dp(1), cy + hs + dp(1), right + dp(1), cy - hs - dp(1), p)
+        p.strokeWidth = dp(2)
+        p.color = Tdr.ACCENT
+        canvas.drawLine(x0 - dp(1), cy + hs + dp(1), right + dp(1), cy - hs - dp(1), p)
+        p.strokeCap = Paint.Cap.BUTT
+        p.style = Paint.Style.FILL
     }
 }

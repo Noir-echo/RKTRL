@@ -27,6 +27,8 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
     var accent = Tdr.YELLOW
         set(v) { field = v; invalidate() }
     var onEdited: ((Int) -> Unit)? = null
+    /** Mode « choisir une case » (début / fin / solo) : un toucher appelle onPick au lieu d'activer le pas. */
+    var onPick: ((Int) -> Unit)? = null
     /** Appui long sur un pas : mode avancé (expression). */
     var onLongPress: ((Int) -> Unit)? = null
     private var longFired = false
@@ -107,7 +109,7 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
                 moved = false
                 longFired = false
                 removeCallbacks(longPress)
-                postDelayed(longPress, 550)
+                if (onPick == null) postDelayed(longPress, 550)
                 invalidate()
                 return true
             }
@@ -131,7 +133,10 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
             }
             MotionEvent.ACTION_UP -> {
                 removeCallbacks(longPress)
-                if (touchIdx >= 0 && !longFired) {
+                val pick = onPick
+                if (touchIdx >= 0 && !longFired && pick != null && !moved) {
+                    pick(touchIdx)
+                } else if (touchIdx >= 0 && !longFired) {
                     val s = tr.steps[touchIdx]
                     if (!moved) s.on = !s.on
                     onEdited?.invoke(touchIdx)
@@ -193,7 +198,7 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
             val r = (col + 1) * cw - dp(3)
             val b = (row + 1) * ch - dp(3)
             val s = tr.steps[i]
-            val inLoop = i < tr.length
+            val inLoop = i < tr.length && i >= tr.start
             val alpha = if (inLoop) 255 else 60
 
             Tdr.cutPath(path, l, t, r, b, dp(7))
@@ -302,9 +307,9 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
             val r = (col + 1) * cw - dp(2.5f)
             val b = (row + 1) * ch - dp(2.5f)
             val s = tr.steps[i]
-            val inLoop = i < tr.length
+            val inLoop = i < tr.length && i >= tr.start
             val play = i == playing
-            val alpha = if (inLoop) 255 else 70
+            val alpha = if (inLoop && (tr.solo < 0 || tr.solo == i)) 255 else 70
 
             Tdr.cutPath(path, l, t, r, b, dp(6))
             p.style = Paint.Style.FILL
@@ -336,6 +341,19 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
                 // trait à l'intérieur de chaque case ; plus épais si plusieurs notes longues se superposent
                 val th = dp(3) * minOf(covered[i], 4)
                 canvas.drawRect(l + dp(6), b - dp(5) - th, r - dp(6), b - dp(5), p)
+            }
+            // début / fin de la boucle : crochet d'accent sur le bord gauche / droit
+            p.style = Paint.Style.FILL
+            p.color = Tdr.ACCENT
+            p.alpha = 255
+            if (i == tr.start && tr.start > 0) canvas.drawRect(l - dp(2.5f), t + dp(4), l + dp(1.5f), b - dp(4), p)
+            if (i == tr.length - 1 && tr.length < MAX_STEPS) canvas.drawRect(r - dp(1.5f), t + dp(4), r + dp(2.5f), b - dp(4), p)
+            // SOLO : cadre d'accent épais autour du pas
+            if (i == tr.solo) {
+                p.style = Paint.Style.STROKE
+                p.strokeWidth = dp(3)
+                canvas.drawPath(path, p)
+                p.style = Paint.Style.FILL
             }
             // repère « expression » (mode avancé) : petit carré d'accent en bas à droite
             if (s.on && s.hasExpression()) {

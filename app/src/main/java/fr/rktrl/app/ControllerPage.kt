@@ -186,6 +186,12 @@ class ControllerPage(private val act: Activity, private val midi: MidiHub, priva
 
         btnEdit = TdrButton(c, "EDIT", Tdr.YELLOW, "E-01").onClick { toggleEdit() }
         btnGroup = TdrButton(c, "GROUP", Tdr.CYAN, "G-02").onClick { toggleGroup() }
+        // appui long : choisir un ou plusieurs canaux MIDI → tous leurs boutons sont sélectionnés
+        btnGroup.setOnLongClickListener {
+            btnGroup.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+            showChannelGroup()
+            true
+        }
         btnUndo = TdrButton(c, "UNDO", Tdr.ORANGE, "U-03").onClick { undo() }
         btnPlay = TdrButton(c, "▶ PLAY", Tdr.GREEN, "T-01").onClick { seq.toggle(); refreshTransport() }
         val btnDestroy = TdrButton(c, "DESTROY MODE", Tdr.YELLOW)
@@ -405,6 +411,43 @@ class ControllerPage(private val act: Activity, private val midi: MidiHub, priva
     }
 
     /** GROUP : 1er appui = mode sélection multiple ; 2e appui = on sort et tout est désélectionné. */
+    /** GROUP par canal : sélectionne les boutons (des 4 banques) assignés aux canaux choisis. */
+    private fun showChannelGroup() {
+        val c: Context = act
+        val d = TdrDialog(c, tr("GROUP // PAR CANAL MIDI", "GROUP // BY MIDI CHANNEL"))
+        d.note(tr("Tous les boutons des 4 banques réglés sur ces canaux seront sélectionnés. Appuie de nouveau sur GROUP pour tout désélectionner.",
+            "Every knob in the 4 banks set to these channels will be selected. Press GROUP again to deselect everything."))
+        val chosen = BooleanArray(16)
+        for (r in 0 until 2) {
+            val row = LinearLayout(c)
+            row.orientation = LinearLayout.HORIZONTAL
+            for (k in 0 until 8) {
+                val ch = r * 8 + k + 1
+                val n = knobs.count { it.channel == ch }
+                val name = Settings.channelNames[ch - 1].ifBlank { "CH %02d".format(ch) }
+                val b = TdrButton(c, name, Tdr.YELLOW, "%02d · $n".format(ch))
+                b.isEnabled = n > 0
+                b.onClick { chosen[ch - 1] = !chosen[ch - 1]; b.active = chosen[ch - 1] }
+                val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                lp.rightMargin = c.dpi(4)
+                row.addView(b, lp)
+            }
+            d.row(row, 48)
+        }
+        d.action(tr("ANNULER", "CANCEL"), Tdr.DIM) { d.dismiss() }
+        d.action(tr("SÉLECTIONNER", "SELECT"), primary = true) {
+            selected.clear()
+            knobs.forEachIndexed { i, k -> if (chosen[k.channel - 1]) selected.add(i) }
+            if (selected.isNotEmpty()) {
+                groupMode = true
+                editMode = false
+            }
+            selectionChanged()
+            d.dismiss()
+        }
+        d.show()
+    }
+
     private fun toggleGroup() {
         groupMode = !groupMode
         if (groupMode) {

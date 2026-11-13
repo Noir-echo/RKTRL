@@ -50,6 +50,10 @@ class SeqTrack(index: Int) {
     @Volatile var transpose = 0
     @Volatile var mute = false
     @Volatile var dir = 0              // index dans Dirs
+    /** Premier pas de la boucle (la fin est donnée par length). */
+    @Volatile var start = 0
+    /** SOLO : seul ce pas joue (-1 = désactivé). */
+    @Volatile var solo = -1
     @Volatile var pos = -1
     @Volatile var releaseRequest = false
     internal var loop = 0
@@ -64,7 +68,7 @@ class SeqTrack(index: Int) {
 
     fun hasNotes(): Boolean {
         val s = steps
-        for (i in 0 until length) if (s[i].on) return true
+        for (i in start.coerceIn(0, length - 1) until length) if (s[i].on) return true
         return false
     }
 
@@ -190,6 +194,7 @@ class TrackClip(src: SeqTrack) {
     val div = src.div
     val transpose = src.transpose
     val dir = src.dir
+    val start = src.start
     val from = src
 }
 
@@ -285,37 +290,42 @@ class Sequencer(private val midi: MidiHub) {
     }
 
     /** Avance la tête de lecture selon le sens choisi. */
+    /** Avance la tête de lecture selon le sens choisi, entre le début (start) et la fin (length − 1). */
     private fun advance(tr: SeqTrack, reverse: Boolean) {
-        val len = tr.length
+        val end = tr.length - 1
+        val st = tr.start.coerceIn(0, end)
+        val span = end - st + 1
         var d = tr.dir
         if (reverse) d = when (d) { 0 -> 1; 1 -> 0; else -> d }
-        if (tr.pos >= len) tr.pos = -1
+        if (tr.pos > end || (tr.pos >= 0 && tr.pos < st)) tr.pos = -1
         when (d) {
             1 -> { // arrière
-                val p = if (tr.pos < 0) len - 1 else tr.pos - 1
-                if (p < 0) { tr.pos = len - 1; tr.loop++ } else tr.pos = p
+                val p = if (tr.pos < 0) end else tr.pos - 1
+                if (p < st) { tr.pos = end; tr.loop++ } else tr.pos = p
             }
             2 -> { // aller-retour
-                if (tr.pos < 0) { tr.pos = 0; tr.ping = 1 }
-                else if (len <= 1) { tr.pos = 0; tr.loop++ }
+                if (tr.pos < 0) { tr.pos = st; tr.ping = 1 }
+                else if (span <= 1) { tr.pos = st; tr.loop++ }
                 else {
                     var p = tr.pos + tr.ping
-                    if (p >= len) { tr.ping = -1; p = len - 2 }
-                    if (p < 0) { tr.ping = 1; p = 1; tr.loop++ }
-                    tr.pos = p.coerceIn(0, len - 1)
+                    if (p > end) { tr.ping = -1; p = end - 1 }
+                    if (p < st) { tr.ping = 1; p = st + 1; tr.loop++ }
+                    tr.pos = p.coerceIn(st, end)
                 }
             }
             3 -> { // hasard
-                tr.pos = Random.nextInt(len)
+                tr.pos = st + Random.nextInt(span)
                 tr.counter++
-                if (tr.counter % len == 0) tr.loop++
+                if (tr.counter % span == 0) tr.loop++
             }
             else -> { // avant
                 val p = tr.pos + 1
-                if (p >= len) { tr.pos = 0; tr.loop++ } else tr.pos = p
+                if (tr.pos < 0) tr.pos = st
+                else if (p > end) { tr.pos = st; tr.loop++ } else tr.pos = p
             }
         }
     }
+
 
     private fun loop() {
         val t0 = System.nanoTime() + 5_000_000L
@@ -371,10 +381,11 @@ class Sequencer(private val midi: MidiHub) {
                 advance(tr, fxx?.reverse(ch) == true)
                 val sw = swing / 100.0
                 val thisDur = if (count[ti] % 2L == 0L) stepDur * 2 * sw else stepDur * 2 * (1 - sw)
-                val idx = fxx?.scatter(ch, tr.pos, tr.length) ?: tr.pos
+                val idx = (fxx?.scatter(ch, tr.pos, tr.length) ?: tr.pos).coerceIn(0, MAX_STEPS - 1)
                 val st = tr.steps[idx]
 
-                if (st.on && !tr.mute && Conds.pass(st.cond, tr.loop)) {
+                val soloOk = tr.solo < 0 || idx == tr.solo
+                if (st.on && !tr.mute && soloOk && Conds.pass(st.cond, tr.loop)) {
                     var notes = Chords.notes((st.note + tr.transpose).coerceIn(0, 127), st.chord)
                     val vel = if (st.accent) 127 else st.vel
                     // expression du pas : envoyée juste avant la note
@@ -471,6 +482,7 @@ class Sequencer(private val midi: MidiHub) {
     /** KILL : efface la page en cours (A ou B) de la piste et coupe ses notes tenues. */
     fun kill(track: SeqTrack) {
         for (s in track.steps) s.reset()
+        track.solo = -1
         track.releaseRequest = true
         if (!running) release(track)
     }
@@ -485,6 +497,8 @@ class Sequencer(private val midi: MidiHub) {
         track.div = c.div
         track.transpose = c.transpose
         track.dir = c.dir
+        track.start = c.start.coerceIn(0, track.length - 1)
+        track.solo = -1
         track.releaseRequest = true
         return true
     }
@@ -530,6 +544,8 @@ class Sequencer(private val midi: MidiHub) {
             }
         }
         track.length = n
+        track.start = 0
+        track.solo = -1
         track.releaseRequest = true
     }
 }

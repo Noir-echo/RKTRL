@@ -82,6 +82,8 @@ object AutoGen {
             else -> solo(tr, c)
         }
         tr.dir = 0
+        tr.start = 0
+        tr.solo = -1
         tr.releaseRequest = true
     }
 

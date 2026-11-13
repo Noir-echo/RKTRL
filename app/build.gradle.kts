@@ -13,8 +13,8 @@ android {
         applicationId = "fr.rktrl.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "2.2"
+        versionCode = 11
+        versionName = "2.3"
     }
 
     // Clé de signature : JAMAIS dans le dépôt. Sur GitHub, elle vient des « secrets » du dépôt

@@ -177,7 +177,7 @@ object Store {
         seq.tracks.forEach { t ->
             tracks.put(JSONObject()
                 .put("name", t.name).put("ch", t.channel).put("len", t.length).put("div", t.div)
-                .put("tr", t.transpose).put("mute", t.mute).put("dir", t.dir).put("page", t.page)
+                .put("tr", t.transpose).put("mute", t.mute).put("dir", t.dir).put("page", t.page).put("start", t.start).put("solo", t.solo)
                 .put("A", stepsToJson(t.patterns[0])).put("B", stepsToJson(t.patterns[1])))
         }
         o.put("v", VERSION)
@@ -194,7 +194,7 @@ object Store {
             val t = seq.tracks[ti]
             t.releaseRequest = true
             if (ti >= tracks.length()) {
-                t.name = ""; t.channel = ti + 1; t.length = 16; t.div = 2; t.transpose = 0; t.mute = false; t.dir = 0; t.page = 0
+                t.name = ""; t.channel = ti + 1; t.length = 16; t.div = 2; t.transpose = 0; t.mute = false; t.dir = 0; t.page = 0; t.start = 0; t.solo = -1
                 t.patterns.forEach { p -> p.forEach { it.reset() } }
                 continue
             }
@@ -206,6 +206,8 @@ object Store {
             t.transpose = to.optInt("tr", 0).coerceIn(-1024, 1024)
             t.mute = to.optBoolean("mute", false)
             t.dir = to.optInt("dir", 0).coerceIn(0, 3)
+            t.start = to.optInt("start", 0).coerceIn(0, t.length - 1)
+            t.solo = to.optInt("solo", -1).coerceIn(-1, MAX_STEPS - 1)
             t.page = to.optInt("page", 0).coerceIn(0, 1)
             if (v >= 3) {
                 stepsFromJson(to.optJSONArray("A"), t.patterns[0])

@@ -22,18 +22,34 @@ class Step(
     @Volatile var mod: Int = -1,             // CC1, 0–127
     @Volatile var bend: Int = -1,            // pitch bend 0–16383 (8192 = centre)
     @Volatile var accent: Boolean = false,   // vélocité poussée au maximum
-    @Volatile var slide: Boolean = false     // liée à la note suivante (legato + portamento)
+    @Volatile var slide: Boolean = false,    // liée à la note suivante (legato + portamento)
+    /** Accord libre posé avec le piano roll : intervalles (> 0) ajoutés à la note ; null = accord de la liste. */
+    @Volatile var extra: IntArray? = null
 ) {
     fun reset() {
         on = false; note = 60; vel = 100; dur = Durs.DEFAULT; chord = 0; cond = 0; ratch = 1
-        pan = -1; mod = -1; bend = -1; accent = false; slide = false
+        pan = -1; mod = -1; bend = -1; accent = false; slide = false; extra = null
     }
     fun hasExpression() = pan >= 0 || mod >= 0 || bend >= 0 || accent || slide
     fun isDefault() = !on && note == 60 && vel == 100 && dur == Durs.DEFAULT && chord == 0 && cond == 0 && ratch == 1 &&
-        !hasExpression()
+        !hasExpression() && extra == null
+    /** Toutes les notes du pas (avant transposition de la piste). */
+    fun allNotes(): List<Int> {
+        val x = extra ?: return Chords.intervals[chord.coerceIn(0, Chords.LAST)].map { note + it }.filter { it in 0..127 }
+        return (listOf(note) + x.map { note + it }).filter { it in 0..127 }
+    }
+    /** Pose une ou plusieurs notes (piano roll) : accord connu si possible, sinon accord libre. */
+    fun setNotes(notes: Collection<Int>) {
+        val sorted = notes.filter { it in 0..127 }.distinct().sorted()
+        if (sorted.isEmpty()) return
+        note = sorted[0]
+        val iv = sorted.drop(1).map { it - sorted[0] }.toIntArray()
+        val known = Chords.intervals.indexOfFirst { it.size == iv.size + 1 && it.drop(1).toIntArray().contentEquals(iv) }
+        if (known >= 0) { chord = known; extra = null } else { chord = 0; extra = iv }
+    }
     fun copyFrom(o: Step) {
         on = o.on; note = o.note; vel = o.vel; dur = o.dur; chord = o.chord; cond = o.cond; ratch = o.ratch
-        pan = o.pan; mod = o.mod; bend = o.bend; accent = o.accent; slide = o.slide
+        pan = o.pan; mod = o.mod; bend = o.bend; accent = o.accent; slide = o.slide; extra = o.extra?.copyOf()
     }
 }
 
@@ -386,7 +402,9 @@ class Sequencer(private val midi: MidiHub) {
 
                 val soloOk = tr.solo < 0 || idx == tr.solo
                 if (st.on && !tr.mute && soloOk && Conds.pass(st.cond, tr.loop)) {
-                    var notes = Chords.notes((st.note + tr.transpose).coerceIn(0, 127), st.chord)
+                    val x = st.extra
+                    var notes = if (x == null) Chords.notes((st.note + tr.transpose).coerceIn(0, 127), st.chord)
+                        else (listOf(0) + x.toList()).map { st.note + tr.transpose + it }.filter { it in 0..127 }
                     val vel = if (st.accent) 127 else st.vel
                     // expression du pas : envoyée juste avant la note
                     if (st.pan >= 0) midi.sendCC(ch, 10, st.pan)
@@ -537,7 +555,7 @@ class Sequencer(private val midi: MidiHub) {
             }
             val had = s.on
             if (hit) {
-                if (!(keepNotes && had)) { s.note = note.coerceIn(0, 127); s.vel = 100; s.dur = Durs.DEFAULT; s.chord = 0 }
+                if (!(keepNotes && had)) { s.note = note.coerceIn(0, 127); s.vel = 100; s.dur = Durs.DEFAULT; s.chord = 0; s.extra = null }
                 s.on = true
             } else {
                 s.on = false

@@ -31,6 +31,8 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
     var onPick: ((Int) -> Unit)? = null
     /** Appui long sur un pas : mode avancé (expression). */
     var onLongPress: ((Int) -> Unit)? = null
+    /** Piano roll : si des notes sont choisies, un toucher pose ces notes sur le pas (renvoie true si fait). */
+    var stamp: ((Int) -> Boolean)? = null
     private var longFired = false
     private val longPress = Runnable {
         if (touchIdx >= 0 && !moved) {
@@ -77,7 +79,7 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
             StepParam.NOTE -> s.note = v.coerceIn(0, 127)
             StepParam.VEL -> s.vel = v.coerceIn(1, 127)
             StepParam.DUR -> s.dur = v.coerceIn(0, Durs.LAST)
-            StepParam.CHORD -> s.chord = v.coerceIn(0, Chords.LAST)
+            StepParam.CHORD -> { s.chord = v.coerceIn(0, Chords.LAST); s.extra = null }
             StepParam.COND -> s.cond = v.coerceIn(0, Conds.LAST)
             StepParam.RATCH -> s.ratch = v.coerceIn(1, 8)
         }
@@ -138,7 +140,7 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
                     pick(touchIdx)
                 } else if (touchIdx >= 0 && !longFired) {
                     val s = tr.steps[touchIdx]
-                    if (!moved) s.on = !s.on
+                    if (!moved && stamp?.invoke(touchIdx) != true) s.on = !s.on
                     onEdited?.invoke(touchIdx)
                 }
                 touchIdx = -1
@@ -250,7 +252,7 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
                 StepParam.NOTE -> Tdr.noteName((s.note + tr.transpose).coerceIn(0, 127))
                 StepParam.VEL -> v.toString()
                 StepParam.DUR -> Durs.label(v)
-                StepParam.CHORD -> Chords.names[v]
+                StepParam.CHORD -> chordName(s)
                 StepParam.COND -> Conds.labels[v]
                 StepParam.RATCH -> "×$v"
             }
@@ -270,7 +272,7 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
                 p.textAlign = Paint.Align.RIGHT
                 p.color = accent
                 val tags = buildString {
-                    if (s.chord != 0 && param != StepParam.CHORD) append(Chords.names[s.chord])
+                    if ((s.chord != 0 || s.extra != null) && param != StepParam.CHORD) append(chordName(s))
                     if (Durs.isInf(s.dur) && param != StepParam.DUR) { if (isNotEmpty()) append(" "); append("∞") }
                     if (s.cond != 0 && param != StepParam.COND) { if (isNotEmpty()) append(" "); append(Conds.labels[s.cond]) }
                     if (s.ratch > 1 && param != StepParam.RATCH) { if (isNotEmpty()) append(" "); append("×${s.ratch}") }
@@ -287,11 +289,14 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
             StepParam.NOTE -> Tdr.noteName((s.note + tr.transpose).coerceIn(0, 127))
             StepParam.VEL -> v.toString()
             StepParam.DUR -> Durs.label(v)
-            StepParam.CHORD -> Chords.names[v]
+            StepParam.CHORD -> chordName(s)
             StepParam.COND -> Conds.labels[v]
             StepParam.RATCH -> "×$v"
         }
     }
+
+    /** Nom de l'accord ; accord libre (piano roll) = nombre de notes. */
+    private fun chordName(s: Step): String { val x = s.extra; return if (x != null) "${x.size + 1}N" else Chords.names[s.chord] }
 
     /**
      * FIELD : cases cerclées d'encre ; pas actif = encre pleine, texte papier ;
@@ -372,7 +377,7 @@ class StepGridView(ctx: Context) : android.view.View(ctx) {
             canvas.drawText("${i + 1}", l + dp(7), t + dp(10), p)
             if (s.on) {
                 val tags = buildString {
-                    if (s.chord != 0 && param != StepParam.CHORD) append(Chords.names[s.chord])
+                    if ((s.chord != 0 || s.extra != null) && param != StepParam.CHORD) append(chordName(s))
                     if (Durs.isInf(s.dur) && param != StepParam.DUR) { if (isNotEmpty()) append(" "); append("∞") }
                     if (s.cond != 0 && param != StepParam.COND) { if (isNotEmpty()) append(" "); append(Conds.labels[s.cond]) }
                     if (s.ratch > 1 && param != StepParam.RATCH) { if (isNotEmpty()) append(" "); append("×${s.ratch}") }

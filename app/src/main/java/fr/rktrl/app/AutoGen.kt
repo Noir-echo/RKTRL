@@ -90,7 +90,7 @@ object AutoGen {
     private fun set(tr: SeqTrack, i: Int, note: Int, vel: Int = 100, dur: Int = D50, chord: Int = 0, ratch: Int = 1) {
         if (i !in 0 until MAX_STEPS) return
         val s = tr.steps[i]
-        s.on = true; s.note = note.coerceIn(0, 127); s.vel = vel.coerceIn(1, 127); s.dur = dur; s.chord = chord
+        s.on = true; s.note = note.coerceIn(0, 127); s.vel = vel.coerceIn(1, 127); s.dur = dur; s.chord = chord; s.extra = null
         s.ratch = ratch
     }
 

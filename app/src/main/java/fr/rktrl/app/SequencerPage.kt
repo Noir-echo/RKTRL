@@ -25,6 +25,8 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
     var onGoController: (() -> Unit)? = null
     var onLogo: (() -> Unit)? = null
     var onLink: (() -> Unit)? = null
+    /** Écoute d'une note du piano roll (canal, note, appuyé/relâché). */
+    var onPreview: ((ch: Int, note: Int, on: Boolean) -> Unit)? = null
 
     private var current = 0
     private var follow = true
@@ -34,6 +36,13 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
     private lateinit var grid: StepGridView
     private lateinit var pageLabel: TextView
     private lateinit var btnFollow: TdrButton
+    private lateinit var btnPiano: TdrButton
+    private lateinit var rollCol: LinearLayout
+    private lateinit var roll: PianoRollView
+    private lateinit var btnHold: TdrButton
+    private lateinit var btnOctUp: TdrButton
+    private lateinit var btnOctDown: TdrButton
+    private var previewCh = 1
     private val paramBtns = ArrayList<TdrButton>()
     private lateinit var stCh: Stepper
     private lateinit var stLen: Stepper
@@ -118,6 +127,38 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
         tlp.leftMargin = c.dpi(6); tlp.topMargin = c.dpi(4); tlp.bottomMargin = c.dpi(2)
         mid.addView(tabs, tlp)
 
+        // ---- piano roll (entre les pistes et la grille), masqué par défaut
+        rollCol = LinearLayout(c)
+        rollCol.orientation = LinearLayout.VERTICAL
+        rollCol.setPadding(c.dpi(4), c.dpi(4), 0, c.dpi(2))
+        rollCol.visibility = View.GONE
+        mid.addView(rollCol, LinearLayout.LayoutParams(c.dpi(78), ViewGroup.LayoutParams.MATCH_PARENT))
+        roll = PianoRollView(c)
+        roll.onPreview = { n, on ->
+            if (on) previewCh = tr.channel
+            onPreview?.invoke(previewCh, n, on)
+        }
+        roll.onChange = { refreshRoll() }
+        roll.playing = {
+            val t = tr; val pos = t.pos
+            if (seq.running && pos in 0 until MAX_STEPS && t.steps[pos].on) t.steps[pos].allNotes().map { it + t.transpose } else emptyList()
+        }
+        btnOctUp = TdrButton(c, "▲ OCT", Tdr.CYAN).onClick { roll.releaseAll(); roll.base += 12; refreshRoll() }
+        btnOctDown = TdrButton(c, "▼ OCT", Tdr.CYAN).onClick { roll.releaseAll(); roll.base -= 12; refreshRoll() }
+        btnHold = TdrButton(c, "HOLD", Tdr.ACCENT).onClick {
+            roll.hold = !roll.hold
+            if (!roll.hold && roll.selection.size > 1) roll.clear()
+            refreshRoll()
+        }
+        rollCol.addView(btnOctUp, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, c.dpi(28)))
+        val rlp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f)
+        rlp.topMargin = c.dpi(3); rlp.bottomMargin = c.dpi(3)
+        rollCol.addView(roll, rlp)
+        rollCol.addView(btnOctDown, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, c.dpi(28)))
+        val hlp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, c.dpi(30))
+        hlp.topMargin = c.dpi(3)
+        rollCol.addView(btnHold, hlp)
+
         // ---- centre : grille + navigation de pages
         val center = LinearLayout(c)
         center.orientation = LinearLayout.VERTICAL
@@ -127,6 +168,7 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
         grid = StepGridView(c)
         grid.onEdited = { tabs.invalidate() }
         grid.onLongPress = { showStepExpression(it) }
+        grid.stamp = { i -> stampNotes(i) }
         center.addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
         val nav = LinearLayout(c)
@@ -139,14 +181,20 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
         val next = TdrButton(c, "▶", Tdr.CYAN).onClick { follow = false; btnFollow.active = false; goPage(grid.viewPage + 1) }
         pageLabel = Tdr.label(c, "", 12f, Tdr.WHITE)
         pageLabel.gravity = Gravity.CENTER
+        pageLabel.setSingleLine(true)
+        pageLabel.ellipsize = android.text.TextUtils.TruncateAt.END
         btnFollow = TdrButton(c, tr("SUIVRE", "FOLLOW"), Tdr.CYAN).onClick { follow = !follow; btnFollow.active = follow }
         btnFollow.active = follow
         nav.addView(prev, LinearLayout.LayoutParams(c.dpi(48), ViewGroup.LayoutParams.MATCH_PARENT))
         nav.addView(pageLabel, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
         nav.addView(next, LinearLayout.LayoutParams(c.dpi(48), ViewGroup.LayoutParams.MATCH_PARENT))
-        val flp = LinearLayout.LayoutParams(c.dpi(84), ViewGroup.LayoutParams.MATCH_PARENT)
+        val flp = LinearLayout.LayoutParams(c.dpi(76), ViewGroup.LayoutParams.MATCH_PARENT)
         flp.leftMargin = c.dpi(6)
         nav.addView(btnFollow, flp)
+        btnPiano = TdrButton(c, "PIANO", Tdr.CYAN).onClick { togglePiano() }
+        val plp = LinearLayout.LayoutParams(c.dpi(68), ViewGroup.LayoutParams.MATCH_PARENT)
+        plp.leftMargin = c.dpi(6)
+        nav.addView(btnPiano, plp)
 
         // ---- droite : une seule colonne (PISTE puis GLOBAL)
         val scroll = ScrollView(c)
@@ -252,9 +300,9 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
             if (Tdr.field) "" else "P-01").onClick { onGoController?.invoke() }
         btnCtrl.active = Tdr.field
 
-        val all = paramBtns + listOf(btnPlay, btnMute, btnCtrl)
+        val all = paramBtns + listOf(btnMute, btnPlay, btnCtrl)
         all.forEachIndexed { idx, b ->
-            val w = when (idx) { 6 -> 1.2f; 8 -> 1.7f; else -> 1f }
+            val w = when (idx) { 6, 7 -> 1.2f; 8 -> 1.7f; else -> 1f }
             val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, w)
             lp.rightMargin = c.dpi(if (idx == 5) 14 else 5)
             bar.addView(b, lp)
@@ -268,6 +316,37 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
     private fun hideKeyboard(v: View) {
         val imm = act.getSystemService(Context.INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager
         imm?.hideSoftInputFromWindow(v.windowToken, 0)
+    }
+
+    // ------------------------------------------------------------ PIANO ROLL
+    private fun togglePiano() {
+        val show = rollCol.visibility != View.VISIBLE
+        rollCol.visibility = if (show) View.VISIBLE else View.GONE
+        btnPiano.active = show
+        if (!show) { roll.releaseAll(); roll.selection.clear() }
+        refreshRoll()
+    }
+
+    private fun refreshRoll() {
+        btnHold.active = roll.hold
+        btnOctUp.isEnabled = roll.base + 12 <= 115
+        btnOctDown.isEnabled = roll.base - 12 >= 0
+        btnOctUp.invalidate(); btnOctDown.invalidate()
+        roll.invalidate()
+    }
+
+    /**
+     * Notes choisies dans le piano roll + toucher d'un pas = les notes sont posées sur ce pas.
+     * Re-toucher un pas qui a déjà exactement ces notes le coupe.
+     */
+    private fun stampNotes(i: Int): Boolean {
+        if (rollCol.visibility != View.VISIBLE || roll.selection.isEmpty()) return false
+        val s = tr.steps[i]
+        val wanted = roll.selection.map { it - tr.transpose }
+        if (s.on && s.allNotes().toSet() == wanted.toSet()) { s.on = false; return true }
+        s.setNotes(wanted)
+        s.on = true
+        return true
     }
 
     /** Tempo changé ailleurs (TAP BPM du Destroy Mode). */
@@ -354,6 +433,7 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
         }
         grid.invalidate()
         tabs.invalidate()
+        if (rollCol.visibility == View.VISIBLE) roll.invalidate()
         refreshTransport()
     }
 

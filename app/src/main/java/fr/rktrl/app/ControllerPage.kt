@@ -200,8 +200,8 @@ class ControllerPage(private val act: Activity, private val midi: MidiHub, priva
         val btnSeq = TdrButton(c, if (Tdr.field) "SEQUENCER →" else "SEQUENCER  ▶▶", if (Tdr.field) Tdr.ACCENT else Tdr.MAGENTA,
             if (Tdr.field) "" else "P-02").onClick { onGoSequencer?.invoke() }
         btnSeq.active = Tdr.field
-        listOf(btnEdit, btnGroup, btnUndo, btnPlay, btnDestroy, btnSeq).forEachIndexed { idx, b ->
-            val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, if (idx >= 4) 1.5f else 1f)
+        listOf(btnEdit, btnGroup, btnUndo, btnDestroy, btnPlay, btnSeq).forEachIndexed { idx, b ->
+            val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, when (idx) { 3, 5 -> 1.5f; else -> 1f })
             lp.rightMargin = c.dpi(6)
             bar.addView(b, lp)
         }
@@ -411,12 +411,17 @@ class ControllerPage(private val act: Activity, private val midi: MidiHub, priva
     }
 
     /** GROUP : 1er appui = mode sélection multiple ; 2e appui = on sort et tout est désélectionné. */
-    /** GROUP par canal : sélectionne les boutons (des 4 banques) assignés aux canaux choisis. */
+    /**
+     * GROUP par canal et/ou par paramètre (appui long sur GROUP).
+     * Canaux seuls = tous leurs boutons ; paramètres seuls = ce paramètre sur tous les canaux ;
+     * les deux = seulement ces paramètres sur ces canaux.
+     */
     private fun showChannelGroup() {
         val c: Context = act
-        val d = TdrDialog(c, tr("GROUP // PAR CANAL MIDI", "GROUP // BY MIDI CHANNEL"))
-        d.note(tr("Tous les boutons des 4 banques réglés sur ces canaux seront sélectionnés. Appuie de nouveau sur GROUP pour tout désélectionner.",
-            "Every knob in the 4 banks set to these channels will be selected. Press GROUP again to deselect everything."))
+        val d = TdrDialog(c, tr("GROUP // CANAUX ET PARAMÈTRES", "GROUP // CHANNELS AND PARAMETERS"))
+        d.note(tr("Choisis des canaux, des paramètres, ou les deux. Les boutons correspondants des 4 banques seront sélectionnés. Appuie de nouveau sur GROUP pour tout désélectionner.",
+            "Pick channels, parameters, or both. The matching knobs in the 4 banks will be selected. Press GROUP again to deselect everything."))
+        d.section(tr("CANAUX MIDI", "MIDI CHANNELS"))
         val chosen = BooleanArray(16)
         for (r in 0 until 2) {
             val row = LinearLayout(c)
@@ -434,10 +439,46 @@ class ControllerPage(private val act: Activity, private val midi: MidiHub, priva
             }
             d.row(row, 48)
         }
+
+        // paramètres = les numéros de CC utilisés par les boutons, nommés d'après leurs étiquettes
+        d.section(tr("PARAMÈTRES", "PARAMETERS"))
+        val ccs = knobs.map { it.cc }.distinct().sorted()
+        val chosenCc = HashSet<Int>()
+        fun paramName(cc: Int): String {
+            val names = knobs.filter { it.cc == cc }
+                .map { it.label.trim().replace(Regex("\\s*\\d+$"), "").trim() }
+                .filter { it.isNotEmpty() }
+            return names.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key?.take(12) ?: "CC $cc"
+        }
+        val cols = 4
+        ccs.chunked(cols).forEach { line ->
+            val row = LinearLayout(c)
+            row.orientation = LinearLayout.HORIZONTAL
+            for (cc in line) {
+                val n = knobs.count { it.cc == cc }
+                val b = TdrButton(c, paramName(cc), Tdr.CYAN, "CC$cc · $n")
+                b.onClick { if (!chosenCc.remove(cc)) chosenCc.add(cc); b.active = cc in chosenCc }
+                val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                lp.rightMargin = c.dpi(4)
+                row.addView(b, lp)
+            }
+            repeat(cols - line.size) {
+                val lp = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f)
+                lp.rightMargin = c.dpi(4)
+                row.addView(View(c), lp)
+            }
+            d.row(row, 48)
+        }
+
         d.action(tr("ANNULER", "CANCEL"), Tdr.DIM) { d.dismiss() }
         d.action(tr("SÉLECTIONNER", "SELECT"), primary = true) {
+            val anyCh = chosen.any { it }
             selected.clear()
-            knobs.forEachIndexed { i, k -> if (chosen[k.channel - 1]) selected.add(i) }
+            if (anyCh || chosenCc.isNotEmpty()) knobs.forEachIndexed { i, k ->
+                val chOk = !anyCh || chosen[k.channel - 1]
+                val ccOk = chosenCc.isEmpty() || k.cc in chosenCc
+                if (chOk && ccOk) selected.add(i)
+            }
             if (selected.isNotEmpty()) {
                 groupMode = true
                 editMode = false

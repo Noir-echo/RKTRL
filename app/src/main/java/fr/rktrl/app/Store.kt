@@ -143,7 +143,8 @@ object Store {
             val s = steps[i]
             if (s.isDefault()) continue
             a.put(JSONArray().put(i).put(if (s.on) 1 else 0).put(s.note).put(s.vel).put(s.dur).put(s.chord).put(s.cond).put(s.ratch)
-                .put(s.pan).put(s.mod).put(s.bend).put(if (s.accent) 1 else 0).put(if (s.slide) 1 else 0))
+                .put(s.pan).put(s.mod).put(s.bend).put(if (s.accent) 1 else 0).put(if (s.slide) 1 else 0)
+                .put(s.extra?.let { x -> JSONArray().also { j -> x.forEach { j.put(it) } } } ?: JSONArray()))
         }
         return a
     }
@@ -168,6 +169,11 @@ object Store {
             s.bend = e.optInt(10, -1).coerceIn(-1, 16383)
             s.accent = e.optInt(11, 0) == 1
             s.slide = e.optInt(12, 0) == 1
+            val x = e.optJSONArray(13)
+            if (x != null && x.length() in 1..11) {
+                val iv = IntArray(x.length()) { x.optInt(it, 0).coerceIn(1, 127) }
+                s.extra = iv
+            }
         }
     }
 

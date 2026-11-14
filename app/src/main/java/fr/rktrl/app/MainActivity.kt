@@ -100,6 +100,7 @@ class MainActivity : Activity() {
             h.bpm = { seq.bpm }
         }
         ctrl.onLink = { showDeviceDialog() }
+        seqPage.onPreview = { ch, n, on -> if (on) midi.noteOn(ch, n, 100) else midi.noteOff(ch, n) }
         seqPage.onLink = { showDeviceDialog() }
         fxPage.onLink = { showDeviceDialog() }
 

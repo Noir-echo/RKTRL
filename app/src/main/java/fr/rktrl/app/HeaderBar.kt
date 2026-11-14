@@ -43,7 +43,7 @@ class HeaderBar(ctx: Context, private val code: String, private val title: Strin
         }
     }
 
-    private fun logoWidth() = if (Tdr.field) height * 3.4f else height * 5.2f
+    private fun logoWidth() = if (Tdr.field) height * 3.8f else height * 5.2f
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) downX = event.x
@@ -58,7 +58,7 @@ class HeaderBar(ctx: Context, private val code: String, private val title: Strin
         val base = h / 2
         p.typeface = Tdr.logo
         p.textAlign = Paint.Align.LEFT
-        p.textSize = h * 0.5f
+        p.textSize = h * 0.64f
         p.color = if (isPressed && downX < logoWidth()) Tdr.ACCENT else Tdr.WHITE
         val ty = base - (p.descent() + p.ascent()) / 2
         canvas.drawText("RKTRL", dp(16), ty, p)

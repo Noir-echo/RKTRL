@@ -191,7 +191,7 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
         val flp = LinearLayout.LayoutParams(c.dpi(76), ViewGroup.LayoutParams.MATCH_PARENT)
         flp.leftMargin = c.dpi(6)
         nav.addView(btnFollow, flp)
-        btnPiano = TdrButton(c, "PIANO", Tdr.CYAN).onClick { togglePiano() }
+        btnPiano = TdrButton(c, tr("CLAVIER", "KEYBOARD"), Tdr.CYAN).onClick { togglePiano() }
         val plp = LinearLayout.LayoutParams(c.dpi(68), ViewGroup.LayoutParams.MATCH_PARENT)
         plp.leftMargin = c.dpi(6)
         nav.addView(btnPiano, plp)
@@ -241,7 +241,7 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
         stTr = Stepper(c, tr("TRANSPO (±1024)", "TRANSPOSE (±1024)"), -1024, 1024, tr.transpose, editable = true,
             onChange = { tr.transpose = it; grid.invalidate() }, compact = true)
         add(stCh, 40); add(stLen, 40); add(stDiv, 40); add(stTr, 40)
-        btnSeq = TdrButton(c, "SEQ", Tdr.YELLOW).onClick { if (pick != Pick.NONE) setPick(Pick.NONE) else showSeqDialog() }
+        btnSeq = TdrButton(c, tr("LECTURE", "PLAYBACK"), Tdr.YELLOW).onClick { if (pick != Pick.NONE) setPick(Pick.NONE) else showSeqDialog() }
         add(btnSeq, 34)
 
         btnA = TdrButton(c, "PAGE A", Tdr.CYAN).onClick { setAB(0) }
@@ -455,7 +455,7 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
     private fun setPick(m: Pick) {
         pick = m
         btnSeq.text = when (m) {
-            Pick.NONE -> if (tr.solo >= 0) "SEQ · SOLO ${tr.solo + 1}" else "SEQ"
+            Pick.NONE -> if (tr.solo >= 0) tr("LECTURE · SOLO ", "PLAYBACK · SOLO ") + (tr.solo + 1) else tr("LECTURE", "PLAYBACK")
             Pick.START, Pick.BOTH_START -> tr("▸ TOUCHE LE DÉBUT", "▸ TAP THE START")
             Pick.END, Pick.BOTH_END -> tr("▸ TOUCHE LA FIN", "▸ TAP THE END")
             Pick.SOLO -> tr("▸ TOUCHE LE PAS SOLO", "▸ TAP THE SOLO STEP")
@@ -488,7 +488,7 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
 
     private fun showSeqDialog() {
         val c: Context = act
-        val d = TdrDialog(c, tr("SEQ // PISTE ${current + 1}", "SEQ // TRACK ${current + 1}"))
+        val d = TdrDialog(c, tr("LECTURE // PISTE ${current + 1}", "PLAYBACK // TRACK ${current + 1}"))
         d.section(tr("SENS DE LECTURE", "PLAY DIRECTION"))
         d.body.addView(choiceGrid(c, Dirs.labels(), 4, tr.dir, Tdr.ACCENT) { tr.dir = it })
 
@@ -713,23 +713,32 @@ class SequencerPage(private val act: Activity, private val seq: Sequencer) {
         d.show()
     }
 
-    private fun describe(t: Int): String = when (t) {
-        0 -> tr("Basse house / disco / funk sur 2 mesures.", "House / disco / funk bass over 2 bars.")
-        1 -> tr("Mélodie en question / réponse, notes liées.", "Call-and-response melody with tied notes.")
-        2 -> tr("Ligne acid façon 303 : accents et slides (activer le portamento du synthé).",
+    private fun describe(t: Int): String = when (AutoGen.id(t)) {
+        "FUNKY" -> tr("Basse house / disco / funk sur 2 mesures.", "House / disco / funk bass over 2 bars.")
+        "TECHNO" -> tr("Basse techno roulante en contretemps.", "Rolling off-beat techno bass.")
+        "EBM" -> tr("Basse EBM en doubles croches, octaves qui claquent.", "Driving EBM 16th-note bass with snapping octaves.")
+        "TRANCE" -> tr("Basse galopante en tierces sur 4 mesures, comme dans la trance (croche + deux doubles, ou roulement en contretemps).",
+            "Galloping bass in thirds over 4 bars, trance style (8th + two 16ths, or rolling off-beat).")
+        "LEAD" -> tr("Mélodie en question / réponse, notes liées.", "Call-and-response melody with tied notes.")
+        "ACID" -> tr("Ligne acid façon 303 : accents et slides (activer le portamento du synthé).",
             "303-style acid line: accents and slides (turn on the synth's portamento).")
-        3 -> tr("Accords longs et mouvants sur 4 mesures (synthé polyphonique).",
+        "PAD" -> tr("Accords longs et mouvants sur 4 mesures (synthé polyphonique).",
             "Long, moving chords over 4 bars (polyphonic synth).")
-        4 -> tr("Une note tenue en continu (∞).", "One continuously held note (∞).")
-        5 -> tr("Arpège qui suit une grille d'accords.", "Arpeggio following a chord progression.")
-        6 -> tr("Basse techno roulante en contretemps.", "Rolling off-beat techno bass.")
-        7 -> tr("Ostinato hypnotique façon école de Berlin.", "Hypnotic Berlin-school ostinato.")
-        8 -> tr("Riff rock / métal en power chords : chugs étouffés + accords plaqués (synthé polyphonique).",
+        "ATMOS" -> tr("Deux longs accords dissonants et sombres sur 4 mesures : secondes frottées, tritons, clusters (synthé polyphonique, son de pad).",
+            "Two long, dark, dissonant chords over 4 bars: rubbing seconds, tritones, clusters (polyphonic synth, pad sound).")
+        "DUB" -> tr("Accords mineurs ouverts (m7, m9, m11) plaqués en contretemps, suivis d'échos qui s'éteignent, esprit dub techno. Ajoute un vrai délai pour l'effet complet.",
+            "Open minor chords (m7, m9, m11) stabbed off-beat, followed by fading echoes, dub techno style. Add a real delay for the full effect.")
+        "DRONE" -> tr("Une note tenue en continu (∞).", "One continuously held note (∞).")
+        "ARP" -> tr("Arpège qui suit une grille d'accords.", "Arpeggio following a chord progression.")
+        "BERLIN" -> tr("Ostinato hypnotique façon école de Berlin.", "Hypnotic Berlin-school ostinato.")
+        "NOIR" -> tr("Techno sombre et industrielle : basse lourde en doubles croches, notes répétées, accents en 3-3-2, seconde mineure et triton pour la tension. À jouer sur un son saturé.",
+            "Dark, industrial techno: heavy repeated 16th-note bass, 3-3-2 accents, minor second and tritone for tension. Play it through a distorted sound.")
+        "RIFF" -> tr("Riff rock / métal en power chords : chugs étouffés + accords plaqués (synthé polyphonique).",
             "Rock / metal power-chord riff: palm-muted chugs + chord stabs (polyphonic synth).")
-        9 -> tr("Chugs graves syncopés, rafales et dissonances, esprit bandes-son métal industriel. Longueur parfois impaire.",
+        "DJENT" -> tr("Chugs graves syncopés, rafales et dissonances, esprit bandes-son métal industriel. Longueur parfois impaire.",
             "Low syncopated chugs, bursts and dissonances, industrial-metal soundtrack style. Sometimes odd length.")
-        10 -> tr("Basse EBM en doubles croches, octaves qui claquent.", "Driving EBM 16th-note bass with snapping octaves.")
         else -> tr("Solo de guitare / synthé : montées, descentes, trilles et notes tenues (pentatonique).",
             "Guitar / synth solo: runs, trills and held notes (pentatonic).")
     }
+
 }

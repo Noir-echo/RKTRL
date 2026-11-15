@@ -9,10 +9,30 @@ import kotlin.random.Random
  */
 object AutoGen {
 
-    val types = arrayOf("BASSLINE", "LEAD", "ACID", "PAD", "DRONE", "ARP", "TECHNO", "BERLIN",
-        "RIFF", "DJENT", "EBM", "SOLO")
+    /** Identifiants internes, dans l'ordre d'affichage (grille de 4 colonnes). */
+    private val ids = arrayOf("FUNKY", "TECHNO", "EBM", "TRANCE",
+        "LEAD", "ACID", "PAD", "ATMOS",
+        "DUB", "DRONE", "ARP", "BERLIN",
+        "NOIR", "RIFF", "DJENT", "SOLO")
+    val types: Array<String> get() = ids.map { label(it) }.toTypedArray()
+    fun id(type: Int) = ids[type.coerceIn(0, ids.size - 1)]
+    private fun label(id: String) = when (id) {
+        "FUNKY" -> "FUNKY BASS"
+        "TECHNO" -> "TECHNO BASS"
+        "ATMOS" -> tr("ATMOSPHÈRE", "ATMOSPHERE")
+        "DUB" -> "DUB CHORDS"
+        else -> id
+    }
     /** Octave conseillée pour chaque type (C2 = 36…). */
-    val defaultOctave = intArrayOf(2, 4, 2, 3, 2, 4, 1, 3, 2, 1, 2, 4)
+    val defaultOctave: IntArray get() = ids.map {
+        when (it) {
+            "FUNKY", "ACID", "DRONE", "RIFF", "EBM", "NOIR" -> 2
+            "TECHNO", "DJENT" -> 1
+            "TRANCE" -> 2
+            "PAD", "BERLIN", "DUB", "ATMOS" -> 3
+            else -> 4
+        }
+    }.toIntArray()
 
     private val MINOR = intArrayOf(0, 2, 3, 5, 7, 8, 10)
     private val MAJOR = intArrayOf(0, 2, 4, 5, 7, 9, 11)
@@ -67,18 +87,22 @@ object AutoGen {
         val c = Ctx(root, octave, minor)
         for (s in tr.steps) s.reset()
         tr.transpose = 0
-        when (type) {
-            0 -> bassline(tr, c)
-            1 -> lead(tr, c)
-            2 -> acid(tr, c)
-            3 -> pad(tr, c)
-            4 -> drone(tr, c)
-            5 -> arp(tr, c)
-            6 -> techno(tr, c)
-            7 -> berlin(tr, c)
-            8 -> riff(tr, c)
-            9 -> djent(tr, c)
-            10 -> ebm(tr, c)
+        when (id(type)) {
+            "FUNKY" -> bassline(tr, c)
+            "TECHNO" -> techno(tr, c)
+            "EBM" -> ebm(tr, c)
+            "TRANCE" -> trance(tr, c)
+            "LEAD" -> lead(tr, c)
+            "ACID" -> acid(tr, c)
+            "PAD" -> pad(tr, c)
+            "ATMOS" -> atmos(tr, c)
+            "DUB" -> dub(tr, c)
+            "DRONE" -> drone(tr, c)
+            "ARP" -> arp(tr, c)
+            "BERLIN" -> berlin(tr, c)
+            "NOIR" -> noir(tr, c)
+            "RIFF" -> riff(tr, c)
+            "DJENT" -> djent(tr, c)
             else -> solo(tr, c)
         }
         tr.dir = 0
@@ -94,6 +118,14 @@ object AutoGen {
         s.ratch = ratch
     }
 
+    /** Pas avec plusieurs notes libres (accords hors liste : clusters, m11…). */
+    private fun setMany(tr: SeqTrack, i: Int, notes: List<Int>, vel: Int = 100, dur: Int = D50) {
+        if (i !in 0 until MAX_STEPS) return
+        val s = tr.steps[i]
+        s.on = true; s.vel = vel.coerceIn(1, 127); s.dur = dur; s.ratch = 1
+        s.setNotes(notes.map { it.coerceIn(0, 127) })
+    }
+
     private fun pattern(p: String, i: Int) = p[i % p.length] == 'x'
 
     private val progressions = arrayOf(
@@ -101,7 +133,7 @@ object AutoGen {
         intArrayOf(0, 3, 0, 4), intArrayOf(0, 5, 3, 4), intArrayOf(0, 2, 5, 6)
     )
 
-    // ------------------------------------------------------------ BASSLINE (house / disco / funk)
+    // ------------------------------------------------------------ FUNKY BASS (house / disco / funk)
     private fun bassline(tr: SeqTrack, c: Ctx) {
         tr.length = 32; tr.div = Divs.D16
         val bar2 = listOf(3, 4, 5, 6, -2).random()          // degré de la 2e mesure
@@ -222,7 +254,7 @@ object AutoGen {
         }
     }
 
-    // ------------------------------------------------------------ TECHNO (basse roulante)
+    // ------------------------------------------------------------ TECHNO BASS (basse roulante)
     private fun techno(tr: SeqTrack, c: Ctx) {
         tr.length = 16; tr.div = Divs.D16
         val rhythm = listOf(".xxx", "..x.", ".xx.", "..xx").random()
@@ -304,6 +336,86 @@ object AutoGen {
             val d = if (i >= 12) turn else 0
             val n = if (ch == 'O') c.deg(d, 1) else c.deg(d)
             set(tr, i, n, if (i % 4 == 0) 122 else 98, if (ch == 'O') D25 else D50)
+        }
+    }
+
+    // ------------------------------------------------------------ TRANCE (basse galopante en tierces)
+    private fun trance(tr: SeqTrack, c: Ctx) {
+        tr.length = 64; tr.div = Divs.D16                       // 4 mesures
+        val prog = listOf(intArrayOf(0, 5, 2, 6), intArrayOf(0, 5, 3, 4), intArrayOf(0, 3, 5, 6), intArrayOf(0, 0, 5, 6)).random()
+        // galop : croche + 2 doubles (x.xx) ou roulement en contretemps (.xxx)
+        val gallop = listOf("x.xx", "x.xx", ".xxx", "xx.x").random()
+        val upper = Random.nextBoolean()                       // tierce au-dessus ou alternance
+        for (i in 0 until 64) {
+            if (!pattern(gallop, i)) continue
+            val d = prog[(i / 16) % 4]
+            val vel = if (i % 4 == 0 || (gallop[0] == '.' && i % 4 == 1)) 118 else 96
+            if (upper) setMany(tr, i, listOf(c.deg(d), c.deg(d + 2)), vel, D50)       // dyade en tierce
+            else set(tr, i, if (i % 2 == 0) c.deg(d) else c.deg(d + 2), vel, D50)     // va-et-vient tierce
+        }
+    }
+
+    // ------------------------------------------------------------ ATMOSPHÈRE (accords longs, sombres et dissonants)
+    private fun atmos(tr: SeqTrack, c: Ctx) {
+        tr.length = 16; tr.div = Divs.D4                        // 16 noires = 4 mesures
+        val clusters = listOf(
+            intArrayOf(0, 1, 7, 10),        // m7 avec seconde mineure frottée
+            intArrayOf(0, 3, 6, 11),        // demi-diminué serré, septième majeure
+            intArrayOf(0, 2, 3, 7, 14),     // mineur add9 en cluster
+            intArrayOf(0, 6, 11, 13),       // triton + neuvième mineure
+            intArrayOf(0, 5, 6, 10),        // quarte et triton empilés
+            intArrayOf(0, 3, 8, 13)         // phrygien sombre
+        ).shuffled()
+        val moves = listOf(intArrayOf(0, -1), intArrayOf(0, 1), intArrayOf(0, -4), intArrayOf(0, 6), intArrayOf(0, -2)).random()
+        for (k in 0..1) {
+            val root = c.base + moves[k]
+            setMany(tr, k * 8, clusters[k].map { root + it }, Random.nextInt(65, 85), D800)
+        }
+    }
+
+    // ------------------------------------------------------------ DUB CHORDS (stabs mineurs en contretemps + échos)
+    private fun dub(tr: SeqTrack, c: Ctx) {
+        tr.length = 32; tr.div = Divs.D16                       // 2 mesures
+        val voicing = listOf(intArrayOf(0, 3, 7, 10), intArrayOf(0, 3, 7, 10, 14), intArrayOf(0, 7, 10, 15, 17),
+            intArrayOf(0, 3, 10, 14, 17)).random()                // m7, m9, m11 ouverts
+        val second = listOf(0, 0, -2, 3, 5).random()            // la 2e mesure peut glisser d'un degré
+        val hits = listOf(intArrayOf(2, 10), intArrayOf(3, 11), intArrayOf(2, 7, 10), intArrayOf(3, 10, 14)).random()
+        for (bar in 0..1) {
+            val root = if (bar == 1 && second != 0) c.deg(second) else c.base
+            val notes = voicing.map { root + it }
+            for (h in hits) {
+                val i = bar * 16 + h
+                setMany(tr, i, notes, 112, D25)
+                // échos façon délai 3/16 qui s'éteignent
+                var v = 82; var e = i + 3
+                while (v > 40 && e < (bar + 1) * 16 && !tr.steps[e].on) { setMany(tr, e, notes, v, D25); v -= 20; e += 3 }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------ NOIR (techno sombre et industrielle)
+    private fun noir(tr: SeqTrack, c: Ctx) {
+        tr.length = 32; tr.div = Divs.D16
+        val r = c.base
+        // vocabulaire : fondamentale, seconde mineure, triton, octave, quinte en dessous
+        fun n(ch: Char) = when (ch) {
+            'b' -> r + 1; 't' -> r + 6; 'o' -> r + 12; 'f' -> r - 5; 'm' -> r + 3; else -> r
+        }
+        val bars = listOf(
+            "RRR.RRbRRRR.RRtR", "RR.RR.RRRR.RoRbR", "R.RRR.RRR.RRmRbR",
+            "RRR.RRR.RR.RtRbR", "RfRRRfRRRfRRbRtR"
+        ).shuffled()
+        val accent = "x..x..x.x..x..x."                          // 3-3-2 qui pousse
+        for (bar in 0..1) {
+            val line = bars[bar]
+            for (k in 0 until 16) {
+                val ch = line[k]
+                if (ch == '.') continue
+                val i = bar * 16 + k
+                val acc = accent[k] == 'x'
+                set(tr, i, n(ch), if (acc) 124 else Random.nextInt(84, 100), if (acc) D50 else D25,
+                    ratch = if (bar == 1 && k == 15 && Random.nextBoolean()) 2 else 1)
+            }
         }
     }
 
